@@ -25,6 +25,12 @@ export default function AdminDashboard() {
   // Modal states
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
+  const [showEditStaffModal, setShowEditStaffModal] = useState(false);
+  const [showEditDepartmentModal, setShowEditDepartmentModal] = useState(false);
+  
+  // Edit states
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   
   // Form states
   const [newStaff, setNewStaff] = useState({
@@ -37,6 +43,20 @@ export default function AdminDashboard() {
   });
   
   const [newDepartment, setNewDepartment] = useState({
+    name: '',
+    description: ''
+  });
+
+  const [editStaffForm, setEditStaffForm] = useState({
+    name: '',
+    position: '',
+    email: '',
+    phone: '',
+    department_id: '',
+    status: 'active' as 'active' | 'inactive'
+  });
+
+  const [editDepartmentForm, setEditDepartmentForm] = useState({
     name: '',
     description: ''
   });
@@ -174,6 +194,54 @@ export default function AdminDashboard() {
     }
   };
 
+  const editStaff = async () => {
+    if (!editingStaff || !editStaffForm.name || !editStaffForm.position || !editStaffForm.email) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('staff')
+        .update({
+          name: editStaffForm.name,
+          position: editStaffForm.position,
+          email: editStaffForm.email,
+          phone: editStaffForm.phone || null,
+          department_id: editStaffForm.department_id || null,
+          status: editStaffForm.status,
+        })
+        .eq('id', editingStaff.id);
+
+      if (error) {
+        console.error('Error updating staff:', error);
+        Alert.alert('Error', 'Failed to update staff member');
+      } else {
+        Alert.alert('Success', 'Staff member updated successfully');
+        setShowEditStaffModal(false);
+        setEditingStaff(null);
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error in editStaff:', error);
+      Alert.alert('Error', 'Failed to update staff member');
+    }
+  };
+
+  const openEditStaffModal = (staffMember: Staff) => {
+    console.log('Opening edit modal for staff:', staffMember.name);
+    setEditingStaff(staffMember);
+    setEditStaffForm({
+      name: staffMember.name,
+      position: staffMember.position,
+      email: staffMember.email,
+      phone: staffMember.phone || '',
+      department_id: staffMember.department_id || '',
+      status: staffMember.status || 'active'
+    });
+    setShowEditStaffModal(true);
+  };
+
   const removeStaff = async (staffId: string, staffName: string) => {
     console.log('removeStaff function called with:', { staffId, staffName });
     Alert.alert(
@@ -245,6 +313,46 @@ export default function AdminDashboard() {
     }
   };
 
+  const editDepartment = async () => {
+    if (!editingDepartment || !editDepartmentForm.name) {
+      Alert.alert('Error', 'Please enter a department name');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('departments')
+        .update({
+          name: editDepartmentForm.name,
+          description: editDepartmentForm.description || null,
+        })
+        .eq('id', editingDepartment.id);
+
+      if (error) {
+        console.error('Error updating department:', error);
+        Alert.alert('Error', 'Failed to update department');
+      } else {
+        Alert.alert('Success', 'Department updated successfully');
+        setShowEditDepartmentModal(false);
+        setEditingDepartment(null);
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error in editDepartment:', error);
+      Alert.alert('Error', 'Failed to update department');
+    }
+  };
+
+  const openEditDepartmentModal = (department: Department) => {
+    console.log('Opening edit modal for department:', department.name);
+    setEditingDepartment(department);
+    setEditDepartmentForm({
+      name: department.name,
+      description: department.description || ''
+    });
+    setShowEditDepartmentModal(true);
+  };
+
   const removeDepartment = async (departmentId: string, departmentName: string) => {
     console.log('removeDepartment function called with:', { departmentId, departmentName });
     Alert.alert(
@@ -305,23 +413,42 @@ export default function AdminDashboard() {
             </Text>
           </View>
         </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.removeButton, 
-            { 
-              backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
-              opacity: pressed ? 0.8 : 1
-            }
-          ]}
-          onPress={() => {
-            console.log('Trash icon pressed for staff:', item.name);
-            removeStaff(item.id, item.name);
-          }}
-          accessibilityLabel={`Remove ${item.name}`}
-          accessibilityRole="button"
-        >
-          <IconSymbol name="trash" color={colors.accent} size={22} />
-        </Pressable>
+        <View style={styles.actionButtons}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.editButton, 
+              { 
+                backgroundColor: pressed ? colors.primary + '40' : colors.primary + '20',
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+            onPress={() => {
+              console.log('Edit icon pressed for staff:', item.name);
+              openEditStaffModal(item);
+            }}
+            accessibilityLabel={`Edit ${item.name}`}
+            accessibilityRole="button"
+          >
+            <IconSymbol name="pencil" color={colors.primary} size={20} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.removeButton, 
+              { 
+                backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+            onPress={() => {
+              console.log('Trash icon pressed for staff:', item.name);
+              removeStaff(item.id, item.name);
+            }}
+            accessibilityLabel={`Remove ${item.name}`}
+            accessibilityRole="button"
+          >
+            <IconSymbol name="trash" color={colors.accent} size={20} />
+          </Pressable>
+        </View>
       </View>
       
       <View style={styles.staffDetails}>
@@ -362,23 +489,42 @@ export default function AdminDashboard() {
             </Text>
           )}
         </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.removeButton, 
-            { 
-              backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
-              opacity: pressed ? 0.8 : 1
-            }
-          ]}
-          onPress={() => {
-            console.log('Trash icon pressed for department:', item.name);
-            removeDepartment(item.id, item.name);
-          }}
-          accessibilityLabel={`Remove ${item.name} department`}
-          accessibilityRole="button"
-        >
-          <IconSymbol name="trash" color={colors.accent} size={22} />
-        </Pressable>
+        <View style={styles.actionButtons}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.editButton, 
+              { 
+                backgroundColor: pressed ? colors.primary + '40' : colors.primary + '20',
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+            onPress={() => {
+              console.log('Edit icon pressed for department:', item.name);
+              openEditDepartmentModal(item);
+            }}
+            accessibilityLabel={`Edit ${item.name} department`}
+            accessibilityRole="button"
+          >
+            <IconSymbol name="pencil" color={colors.primary} size={20} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.removeButton, 
+              { 
+                backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+            onPress={() => {
+              console.log('Trash icon pressed for department:', item.name);
+              removeDepartment(item.id, item.name);
+            }}
+            accessibilityLabel={`Remove ${item.name} department`}
+            accessibilityRole="button"
+          >
+            <IconSymbol name="trash" color={colors.accent} size={20} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -516,6 +662,155 @@ export default function AdminDashboard() {
     </Modal>
   );
 
+  const renderEditStaffModal = () => (
+    <Modal
+      visible={showEditStaffModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowEditStaffModal(false)}
+    >
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Staff</Text>
+          <Pressable onPress={() => setShowEditStaffModal(false)}>
+            <IconSymbol name="xmark" color={colors.text} size={24} />
+          </Pressable>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Name *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter staff name"
+              placeholderTextColor={colors.textSecondary}
+              value={editStaffForm.name}
+              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, name: text })}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Position *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter position"
+              placeholderTextColor={colors.textSecondary}
+              value={editStaffForm.position}
+              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, position: text })}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Email *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter email address"
+              placeholderTextColor={colors.textSecondary}
+              value={editStaffForm.email}
+              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, email: text })}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Phone</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter phone number"
+              placeholderTextColor={colors.textSecondary}
+              value={editStaffForm.phone}
+              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, phone: text })}
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Department</Text>
+            <View style={styles.pickerContainer}>
+              {departments.map((dept) => (
+                <Pressable
+                  key={dept.id}
+                  style={[
+                    styles.pickerOption,
+                    { 
+                      backgroundColor: editStaffForm.department_id === dept.id ? colors.primary + '20' : colors.card,
+                      borderColor: editStaffForm.department_id === dept.id ? colors.primary : colors.secondary + '30'
+                    }
+                  ]}
+                  onPress={() => setEditStaffForm({ ...editStaffForm, department_id: dept.id })}
+                >
+                  <Text style={[
+                    styles.pickerOptionText,
+                    { color: editStaffForm.department_id === dept.id ? colors.primary : colors.text }
+                  ]}>
+                    {dept.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
+            <View style={styles.statusPickerContainer}>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { 
+                    backgroundColor: editStaffForm.status === 'active' ? colors.primary + '20' : colors.card,
+                    borderColor: editStaffForm.status === 'active' ? colors.primary : colors.secondary + '30'
+                  }
+                ]}
+                onPress={() => setEditStaffForm({ ...editStaffForm, status: 'active' })}
+              >
+                <Text style={[
+                  styles.statusOptionText,
+                  { color: editStaffForm.status === 'active' ? colors.primary : colors.text }
+                ]}>
+                  Active
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { 
+                    backgroundColor: editStaffForm.status === 'inactive' ? colors.primary + '20' : colors.card,
+                    borderColor: editStaffForm.status === 'inactive' ? colors.primary : colors.secondary + '30'
+                  }
+                ]}
+                onPress={() => setEditStaffForm({ ...editStaffForm, status: 'inactive' })}
+              >
+                <Text style={[
+                  styles.statusOptionText,
+                  { color: editStaffForm.status === 'inactive' ? colors.primary : colors.text }
+                ]}>
+                  Inactive
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Pressable
+              style={[styles.cancelButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowEditStaffModal(false)}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={editStaff}
+            >
+              <Text style={styles.addButtonText}>Update Staff</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+
   const renderAddDepartmentModal = () => (
     <Modal
       visible={showAddDepartmentModal}
@@ -569,6 +864,66 @@ export default function AdminDashboard() {
               onPress={addDepartment}
             >
               <Text style={styles.addButtonText}>Add Department</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+
+  const renderEditDepartmentModal = () => (
+    <Modal
+      visible={showEditDepartmentModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowEditDepartmentModal(false)}
+    >
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Department</Text>
+          <Pressable onPress={() => setShowEditDepartmentModal(false)}>
+            <IconSymbol name="xmark" color={colors.text} size={24} />
+          </Pressable>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Department Name *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter department name"
+              placeholderTextColor={colors.textSecondary}
+              value={editDepartmentForm.name}
+              onChangeText={(text) => setEditDepartmentForm({ ...editDepartmentForm, name: text })}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              placeholder="Enter department description"
+              placeholderTextColor={colors.textSecondary}
+              value={editDepartmentForm.description}
+              onChangeText={(text) => setEditDepartmentForm({ ...editDepartmentForm, description: text })}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Pressable
+              style={[styles.cancelButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowEditDepartmentModal(false)}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={editDepartment}
+            >
+              <Text style={styles.addButtonText}>Update Department</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -750,7 +1105,9 @@ export default function AdminDashboard() {
       </View>
 
       {renderAddStaffModal()}
+      {renderEditStaffModal()}
       {renderAddDepartmentModal()}
+      {renderEditDepartmentModal()}
     </>
   );
 }
@@ -975,11 +1332,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textTransform: 'capitalize',
   },
-  removeButton: {
-    padding: 12,
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 10,
     borderRadius: 8,
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+  },
+  removeButton: {
+    padding: 10,
+    borderRadius: 8,
+    minWidth: 40,
+    minHeight: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1054,6 +1425,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pickerOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  statusPickerContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusOption: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  statusOptionText: {
     fontSize: 16,
     fontWeight: '500',
   },
