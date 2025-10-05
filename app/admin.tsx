@@ -34,8 +34,6 @@ export default function AdminDashboard() {
   
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [editStaffName, setEditStaffName] = useState("");
-  const [editStaffEmail, setEditStaffEmail] = useState("");
-  const [editStaffDepartment, setEditStaffDepartment] = useState("");
   const [editStaffStatus, setEditStaffStatus] = useState("");
   
   const [newDepartmentName, setNewDepartmentName] = useState("");
@@ -224,7 +222,7 @@ export default function AdminDashboard() {
   };
 
   const editStaff = async () => {
-    if (!editingStaff || !editStaffName || !editStaffEmail || !editStaffDepartment) {
+    if (!editingStaff || !editStaffName) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
@@ -234,8 +232,6 @@ export default function AdminDashboard() {
         .from("staff")
         .update({
           name: editStaffName,
-          email: editStaffEmail,
-          department: editStaffDepartment,
           status: editStaffStatus,
         })
         .eq("id", editingStaff.id)
@@ -259,8 +255,6 @@ export default function AdminDashboard() {
   const openEditStaffModal = (staffMember: Staff) => {
     setEditingStaff(staffMember);
     setEditStaffName(staffMember.name || "");
-    setEditStaffEmail(staffMember.email || "");
-    setEditStaffDepartment(staffMember.department || "");
     setEditStaffStatus(staffMember.status || "active");
     setShowEditStaffModal(true);
   };
@@ -418,8 +412,9 @@ export default function AdminDashboard() {
           </Pressable>
         </View>
       </View>
-      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.email}</Text>
-      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.department}</Text>
+      {item.position && (
+        <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.position}</Text>
+      )}
       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || "") }]}>
         <Text style={styles.statusText}>{item.status}</Text>
       </View>
@@ -803,25 +798,45 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              value={editStaffEmail}
-              onChangeText={setEditStaffEmail}
-              placeholder="Enter email address"
-              keyboardType="email-address"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              value={editStaffDepartment}
-              onChangeText={setEditStaffDepartment}
-              placeholder="Enter department"
-              placeholderTextColor={colors.textSecondary}
-            />
+            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
+            <View style={styles.statusContainer}>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { backgroundColor: colors.card },
+                  editStaffStatus === "active" && { backgroundColor: colors.primary }
+                ]}
+                onPress={() => setEditStaffStatus("active")}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    { color: colors.text },
+                    editStaffStatus === "active" && { color: "white" }
+                  ]}
+                >
+                  Active
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { backgroundColor: colors.card },
+                  editStaffStatus === "inactive" && { backgroundColor: colors.accent }
+                ]}
+                onPress={() => setEditStaffStatus("inactive")}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    { color: colors.text },
+                    editStaffStatus === "inactive" && { color: "white" }
+                  ]}
+                >
+                  Inactive
+                </Text>
+              </Pressable>
+            </View>
           </View>
           <Pressable
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
@@ -1522,6 +1537,22 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   monthButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statusOption: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  statusOptionText: {
     fontSize: 14,
     fontWeight: '600',
   },
