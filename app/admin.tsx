@@ -175,15 +175,21 @@ export default function AdminDashboard() {
   };
 
   const removeStaff = async (staffId: string, staffName: string) => {
+    console.log('removeStaff function called with:', { staffId, staffName });
     Alert.alert(
       'Remove Staff',
       `Are you sure you want to remove ${staffName}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('Staff removal cancelled')
+        },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            console.log('Attempting to remove staff:', staffName);
             try {
               const { error } = await supabase
                 .from('staff')
@@ -194,6 +200,7 @@ export default function AdminDashboard() {
                 console.error('Error removing staff:', error);
                 Alert.alert('Error', 'Failed to remove staff member');
               } else {
+                console.log('Staff member removed successfully:', staffName);
                 Alert.alert('Success', 'Staff member removed successfully');
                 fetchData();
               }
@@ -239,15 +246,21 @@ export default function AdminDashboard() {
   };
 
   const removeDepartment = async (departmentId: string, departmentName: string) => {
+    console.log('removeDepartment function called with:', { departmentId, departmentName });
     Alert.alert(
       'Remove Department',
       `Are you sure you want to remove ${departmentName}? This will unassign all staff from this department.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('Department removal cancelled')
+        },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            console.log('Attempting to remove department:', departmentName);
             try {
               const { error } = await supabase
                 .from('departments')
@@ -258,6 +271,7 @@ export default function AdminDashboard() {
                 console.error('Error removing department:', error);
                 Alert.alert('Error', 'Failed to remove department');
               } else {
+                console.log('Department removed successfully:', departmentName);
                 Alert.alert('Success', 'Department removed successfully');
                 fetchData();
               }
@@ -292,10 +306,21 @@ export default function AdminDashboard() {
           </View>
         </View>
         <Pressable
-          style={[styles.removeButton, { backgroundColor: colors.accent + '20' }]}
-          onPress={() => removeStaff(item.id, item.name)}
+          style={({ pressed }) => [
+            styles.removeButton, 
+            { 
+              backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
+              opacity: pressed ? 0.8 : 1
+            }
+          ]}
+          onPress={() => {
+            console.log('Trash icon pressed for staff:', item.name);
+            removeStaff(item.id, item.name);
+          }}
+          accessibilityLabel={`Remove ${item.name}`}
+          accessibilityRole="button"
         >
-          <IconSymbol name="trash" color={colors.accent} size={20} />
+          <IconSymbol name="trash" color={colors.accent} size={22} />
         </Pressable>
       </View>
       
@@ -338,10 +363,21 @@ export default function AdminDashboard() {
           )}
         </View>
         <Pressable
-          style={[styles.removeButton, { backgroundColor: colors.accent + '20' }]}
-          onPress={() => removeDepartment(item.id, item.name)}
+          style={({ pressed }) => [
+            styles.removeButton, 
+            { 
+              backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
+              opacity: pressed ? 0.8 : 1
+            }
+          ]}
+          onPress={() => {
+            console.log('Trash icon pressed for department:', item.name);
+            removeDepartment(item.id, item.name);
+          }}
+          accessibilityLabel={`Remove ${item.name} department`}
+          accessibilityRole="button"
         >
-          <IconSymbol name="trash" color={colors.accent} size={20} />
+          <IconSymbol name="trash" color={colors.accent} size={22} />
         </Pressable>
       </View>
     </View>
@@ -940,8 +976,14 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   removeButton: {
-    padding: 8,
+    padding: 12,
     borderRadius: 8,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
   },
   staffDetails: {
     gap: 8,
