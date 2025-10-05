@@ -4,8 +4,10 @@ import { Tables, TablesInsert } from "@/app/integrations/supabase/types";
 import { Stack, router } from "expo-router";
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from "react-native";
 import { IconSymbol } from "@/components/IconSymbol";
-import { colors } from "@/styles/commonStyles";
-import FloatingTabBar, { TabBarItem } from "@/components/FloatingTabBar";
+import { colors, spacing, borderRadius, shadows, typography, commonStyles } from "@/styles/commonStyles";
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
 import React, { useState, useEffect } from "react";
 
 type Staff = Tables<"staff">;
@@ -26,7 +28,7 @@ export default function AdminDashboard() {
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showEditDepartmentModal, setShowEditDepartmentModal] = useState(false);
   
-  // Form states - removed email and department fields
+  // Form states
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffStatus, setNewStaffStatus] = useState("active");
   
@@ -40,22 +42,6 @@ export default function AdminDashboard() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [editDepartmentName, setEditDepartmentName] = useState("");
   const [editDepartmentDescription, setEditDepartmentDescription] = useState("");
-
-  // Tab configuration
-  const tabs: TabBarItem[] = [
-    {
-      name: "dashboard",
-      route: "/admin",
-      icon: "square.grid.2x2.fill",
-      label: "Dashboard"
-    },
-    {
-      name: "overview",
-      route: "/admin",
-      icon: "chart.bar.fill",
-      label: "Overview"
-    }
-  ];
 
   // Work overview state
   const [workEntries, setWorkEntries] = useState<any[]>([]);
@@ -105,7 +91,6 @@ export default function AdminDashboard() {
       setDepartments(departmentsResponse.data || []);
       setWorkEntries(workEntriesResponse.data || []);
       
-      // Calculate staff work hours for selected month
       calculateStaffWorkHours(workEntriesResponse.data || [], selectedMonth, selectedYear);
     } catch (error: any) {
       Alert.alert("Error", error.message);
@@ -115,7 +100,6 @@ export default function AdminDashboard() {
   const calculateStaffWorkHours = (entries: any[], month: number, year: number) => {
     const currentYear = new Date().getFullYear();
     
-    // Only process data for the current year
     if (year !== currentYear) {
       setStaffWorkHours({});
       return;
@@ -244,7 +228,6 @@ export default function AdminDashboard() {
             try {
               console.log("Starting staff import...");
               
-              // Check which staff members already exist
               const { data: existingStaff, error: fetchError } = await supabase
                 .from("staff")
                 .select("name");
@@ -259,13 +242,12 @@ export default function AdminDashboard() {
                 return;
               }
 
-              // Prepare staff data for insertion
               const staffData = newStaffToAdd.map(name => ({
                 name: name,
                 status: "active",
-                position: "Staff", // Default position
-                email: `${name.toLowerCase().replace(/\s+/g, '.')}@company.com`, // Generate placeholder email
-                join_date: new Date().toISOString().split('T')[0] // Today's date
+                position: "Staff",
+                email: `${name.toLowerCase().replace(/\s+/g, '.')}@company.com`,
+                join_date: new Date().toISOString().split('T')[0]
               }));
 
               console.log("Inserting staff data:", staffData);
@@ -279,7 +261,6 @@ export default function AdminDashboard() {
 
               console.log("Staff import successful:", data);
 
-              // Update the staff list
               setStaffList((prev) => [...prev, ...(data || [])]);
               
               Alert.alert(
@@ -460,95 +441,143 @@ export default function AdminDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "#4CAF50";
+        return colors.success;
       case "inactive":
-        return "#F44336";
+        return colors.error;
       default:
         return colors.textSecondary;
     }
   };
 
-  const renderStaffCard = ({ item }: { item: Staff }) => (
-    <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
-        <View style={styles.cardActions}>
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => openEditStaffModal(item)}
-          >
-            <IconSymbol name="pencil" color="white" size={16} />
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: colors.accent }]}
-            onPress={() => removeStaff(item.id, item.name || "")}
-          >
-            <IconSymbol name="trash" color="white" size={16} />
-          </Pressable>
+  const renderStaffCard = ({ item, index }: { item: Staff; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+    >
+      <View style={[commonStyles.cardElevated, styles.staffCard]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.staffInfo}>
+            <View style={[styles.staffAvatar, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[commonStyles.bodyMedium, { color: colors.primary }]}>
+                {item.name?.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.staffDetails}>
+              <Text style={[commonStyles.bodyMedium, styles.staffName]}>{item.name}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || 'active') + '20' }]}>
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status || 'active') }]} />
+                <Text style={[commonStyles.caption, { color: getStatusColor(item.status || 'active') }]}>
+                  {item.status || 'active'}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.cardActions}>
+            <Pressable
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => openEditStaffModal(item)}
+            >
+              <IconSymbol name="pencil" color="white" size={16} />
+            </Pressable>
+            <Pressable
+              style={[styles.actionButton, { backgroundColor: colors.error }]}
+              onPress={() => removeStaff(item.id, item.name || "")}
+            >
+              <IconSymbol name="trash" color="white" size={16} />
+            </Pressable>
+          </View>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 
-  const renderDepartmentCard = ({ item }: { item: Department }) => (
-    <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
-        <View style={styles.cardActions}>
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => openEditDepartmentModal(item)}
-          >
-            <IconSymbol name="pencil" color="white" size={16} />
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: colors.accent }]}
-            onPress={() => removeDepartment(item.id, item.name || "")}
-          >
-            <IconSymbol name="trash" color="white" size={16} />
-          </Pressable>
+  const renderDepartmentCard = ({ item, index }: { item: Department; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+    >
+      <View style={[commonStyles.cardElevated, styles.departmentCard]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.departmentInfo}>
+            <View style={[styles.departmentIcon, { backgroundColor: colors.secondary + '20' }]}>
+              <IconSymbol name="building.2" color={colors.secondary} size={24} />
+            </View>
+            <View style={styles.departmentDetails}>
+              <Text style={[commonStyles.bodyMedium, styles.departmentName]}>{item.name}</Text>
+              <Text style={[commonStyles.caption, styles.departmentDescription]}>{item.description}</Text>
+            </View>
+          </View>
+          <View style={styles.cardActions}>
+            <Pressable
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => openEditDepartmentModal(item)}
+            >
+              <IconSymbol name="pencil" color="white" size={16} />
+            </Pressable>
+            <Pressable
+              style={[styles.actionButton, { backgroundColor: colors.error }]}
+              onPress={() => removeDepartment(item.id, item.name || "")}
+            >
+              <IconSymbol name="trash" color="white" size={16} />
+            </Pressable>
+          </View>
         </View>
       </View>
-      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.description}</Text>
-    </View>
+    </Animated.View>
   );
 
   const renderDashboardStats = () => (
     <View style={styles.statsContainer}>
-      <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
-        <Text style={styles.statNumber}>{staffList.length}</Text>
-        <Text style={styles.statLabel}>Total Staff</Text>
-      </View>
-      <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
-        <Text style={styles.statNumber}>{departments.length}</Text>
-        <Text style={styles.statLabel}>Departments</Text>
-      </View>
-      <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
-        <Text style={styles.statNumber}>{staffList.filter(s => s.status === 'active').length}</Text>
-        <Text style={styles.statLabel}>Active Staff</Text>
-      </View>
+      <Animated.View
+        entering={FadeInUp.delay(100).springify()}
+        style={[styles.statCard, { backgroundColor: colors.primary }]}
+      >
+        <LinearGradient
+          colors={[colors.primary, '#6366F1']}
+          style={styles.statGradient}
+        >
+          <IconSymbol name="person.3.fill" color="white" size={28} />
+          <Text style={styles.statNumber}>{staffList.length}</Text>
+          <Text style={styles.statLabel}>Total Staff</Text>
+        </LinearGradient>
+      </Animated.View>
+      
+      <Animated.View
+        entering={FadeInUp.delay(200).springify()}
+        style={[styles.statCard, { backgroundColor: colors.secondary }]}
+      >
+        <LinearGradient
+          colors={[colors.secondary, '#059669']}
+          style={styles.statGradient}
+        >
+          <IconSymbol name="building.2.fill" color="white" size={28} />
+          <Text style={styles.statNumber}>{departments.length}</Text>
+          <Text style={styles.statLabel}>Departments</Text>
+        </LinearGradient>
+      </Animated.View>
+      
+      <Animated.View
+        entering={FadeInUp.delay(300).springify()}
+        style={[styles.statCard, { backgroundColor: colors.accent }]}
+      >
+        <LinearGradient
+          colors={[colors.accent, '#F59E0B']}
+          style={styles.statGradient}
+        >
+          <IconSymbol name="checkmark.circle.fill" color="white" size={28} />
+          <Text style={styles.statNumber}>{staffList.filter(s => s.status === 'active').length}</Text>
+          <Text style={styles.statLabel}>Active Staff</Text>
+        </LinearGradient>
+      </Animated.View>
     </View>
   );
 
   // Overview components
   const StatCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: string; color: string }) => (
-    <View style={[styles.overviewStatCard, { backgroundColor: colors.card }]}>
-      <View style={[styles.statIcon, { backgroundColor: color }]}>
-        <IconSymbol name={icon as any} color="white" size={24} />
+    <View style={[styles.overviewStatCard, commonStyles.cardElevated]}>
+      <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
+        <IconSymbol name={icon as any} color={color} size={24} />
       </View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statTitle, { color: colors.textSecondary }]}>{title}</Text>
-    </View>
-  );
-
-  const EntryCard = ({ entry }: { entry: typeof recentEntries[0] }) => (
-    <View style={[styles.entryCard, { backgroundColor: colors.card }]}>
-      <View style={styles.entryHeader}>
-        <Text style={[styles.entryDate, { color: colors.text }]}>{entry.date}</Text>
-        <Text style={[styles.entryHours, { color: colors.primary }]}>{entry.hours}h</Text>
-      </View>
-      <Text style={[styles.entryProject, { color: colors.textSecondary }]}>{entry.project}</Text>
-      <Text style={[styles.entryDescription, { color: colors.text }]}>{entry.description}</Text>
+      <Text style={[commonStyles.heading3, { color: colors.text }]}>{value}</Text>
+      <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>{title}</Text>
     </View>
   );
 
@@ -560,33 +589,45 @@ export default function AdminDashboard() {
 
     return (
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.overviewHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: colors.secondary }]}>
+        <Animated.View 
+          style={styles.overviewHeader}
+          entering={FadeInUp.springify()}
+        >
+          <LinearGradient
+            colors={[colors.primary, colors.secondary]}
+            style={styles.overviewIconContainer}
+          >
             <IconSymbol name="chart.bar.fill" color="white" size={32} />
-          </View>
-          <Text style={[styles.overviewTitle, { color: colors.text }]}>Work Overview</Text>
-          <Text style={[styles.overviewSubtitle, { color: colors.textSecondary }]}>
+          </LinearGradient>
+          <Text style={[commonStyles.heading2, styles.overviewTitle]}>Work Overview</Text>
+          <Text style={[commonStyles.body, styles.overviewSubtitle]}>
             Staff work hours for {months[selectedMonth]} {selectedYear}
           </Text>
-        </View>
+        </Animated.View>
 
         {/* Month Filter */}
-        <View style={styles.filterSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Filter by Month</Text>
+        <Animated.View 
+          style={styles.filterSection}
+          entering={FadeInDown.delay(100).springify()}
+        >
+          <Text style={[commonStyles.heading4, styles.sectionTitle]}>Filter by Month</Text>
           <Pressable
-            style={[styles.monthPicker, { backgroundColor: colors.card }]}
+            style={[styles.monthPicker, commonStyles.cardElevated]}
             onPress={() => setShowMonthPicker(true)}
           >
-            <Text style={[styles.monthPickerText, { color: colors.text }]}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
               {months[selectedMonth]} {selectedYear}
             </Text>
-            <IconSymbol name="chevron.down" color={colors.text} size={20} />
+            <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
           </Pressable>
-        </View>
+        </Animated.View>
 
         {/* Summary Stats */}
-        <View style={styles.overviewStatsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Monthly Summary</Text>
+        <Animated.View 
+          style={styles.overviewStatsSection}
+          entering={FadeInDown.delay(200).springify()}
+        >
+          <Text style={[commonStyles.heading4, styles.sectionTitle]}>Monthly Summary</Text>
           <View style={styles.overviewStatsGrid}>
             <StatCard
               title="Total Hours"
@@ -610,22 +651,25 @@ export default function AdminDashboard() {
               title="Work Days"
               value={workEntries.length}
               icon="calendar.fill"
-              color={colors.highlight}
+              color={colors.error}
             />
           </View>
-        </View>
+        </Animated.View>
 
         {/* Staff Work Hours */}
-        <View style={styles.staffHoursSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Work Hours</Text>
+        <Animated.View 
+          style={styles.staffHoursSection}
+          entering={FadeInDown.delay(300).springify()}
+        >
+          <Text style={[commonStyles.heading4, styles.sectionTitle]}>Staff Work Hours</Text>
           {Object.keys(staffWorkHours).length === 0 ? (
-            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+            <View style={[styles.emptyState, commonStyles.cardElevated]}>
               <IconSymbol name="clock" color={colors.textSecondary} size={48} />
-              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+              <Text style={[commonStyles.bodyMedium, styles.emptyStateText]}>
                 No work entries found for {months[selectedMonth]} {selectedYear}
               </Text>
               {selectedYear !== currentYear && (
-                <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
+                <Text style={[commonStyles.caption, styles.emptyStateSubtext]}>
                   Data is only saved for the current year ({currentYear})
                 </Text>
               )}
@@ -634,86 +678,104 @@ export default function AdminDashboard() {
             <View style={styles.staffHoursList}>
               {Object.entries(staffWorkHours)
                 .sort(([, hoursA], [, hoursB]) => hoursB - hoursA)
-                .map(([staffKey, hours]) => {
+                .map(([staffKey, hours], index) => {
                   const [staffId, staffName] = staffKey.split('-');
                   return (
-                    <View key={staffKey} style={[styles.staffHourCard, { backgroundColor: colors.card }]}>
-                      <View style={styles.staffHourHeader}>
-                        <View style={[styles.staffAvatar, { backgroundColor: colors.primary }]}>
-                          <Text style={styles.staffAvatarText}>
-                            {staffName.charAt(0).toUpperCase()}
-                          </Text>
+                    <Animated.View 
+                      key={staffKey} 
+                      entering={FadeInDown.delay(index * 50).springify()}
+                    >
+                      <View style={[styles.staffHourCard, commonStyles.cardElevated]}>
+                        <View style={styles.staffHourHeader}>
+                          <LinearGradient
+                            colors={[colors.primary, colors.secondary]}
+                            style={styles.staffHourAvatar}
+                          >
+                            <Text style={styles.staffAvatarText}>
+                              {staffName.charAt(0).toUpperCase()}
+                            </Text>
+                          </LinearGradient>
+                          <View style={styles.staffHourInfo}>
+                            <Text style={[commonStyles.bodyMedium, styles.staffHourName]}>
+                              {staffName}
+                            </Text>
+                            <Text style={[commonStyles.caption, { color: colors.primary }]}>
+                              {hours.toFixed(1)} hours
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.staffHourInfo}>
-                          <Text style={[styles.staffHourName, { color: colors.text }]}>
-                            {staffName}
-                          </Text>
-                          <Text style={[styles.staffHourHours, { color: colors.primary }]}>
-                            {hours.toFixed(1)} hours
-                          </Text>
+                        <View style={styles.staffHourProgress}>
+                          <LinearGradient
+                            colors={[colors.primary, colors.secondary]}
+                            style={[
+                              styles.staffHourProgressBar,
+                              { 
+                                width: `${Math.min((hours / Math.max(...Object.values(staffWorkHours))) * 100, 100)}%`
+                              }
+                            ]}
+                          />
                         </View>
                       </View>
-                      <View style={styles.staffHourProgress}>
-                        <View 
-                          style={[
-                            styles.staffHourProgressBar, 
-                            { 
-                              backgroundColor: colors.primary,
-                              width: `${Math.min((hours / Math.max(...Object.values(staffWorkHours))) * 100, 100)}%`
-                            }
-                          ]} 
-                        />
-                      </View>
-                    </View>
+                    </Animated.View>
                   );
                 })}
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Recent Entries */}
         {workEntries.length > 0 && (
-          <View style={styles.entriesSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
+          <Animated.View 
+            style={styles.entriesSection}
+            entering={FadeInDown.delay(400).springify()}
+          >
+            <Text style={[commonStyles.heading4, styles.sectionTitle]}>Recent Entries</Text>
             <View style={styles.entriesList}>
               {workEntries
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .slice(0, 5)
                 .map((entry, index) => (
-                  <View key={index} style={[styles.entryCard, { backgroundColor: colors.card }]}>
-                    <View style={styles.entryHeader}>
-                      <Text style={[styles.entryDate, { color: colors.text }]}>
-                        {new Date(entry.date).toLocaleDateString()}
+                  <Animated.View 
+                    key={index}
+                    entering={FadeInDown.delay(index * 50).springify()}
+                  >
+                    <View style={[styles.entryCard, commonStyles.cardElevated]}>
+                      <View style={styles.entryHeader}>
+                        <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                          {new Date(entry.date).toLocaleDateString()}
+                        </Text>
+                        <View style={[styles.hoursBadge, { backgroundColor: colors.primary + '20' }]}>
+                          <Text style={[commonStyles.captionMedium, { color: colors.primary }]}>
+                            {entry.hours}h
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[commonStyles.caption, styles.entryProject]}>
+                        {entry.staff?.name || 'Unknown Staff'}
                       </Text>
-                      <Text style={[styles.entryHours, { color: colors.primary }]}>
-                        {entry.hours}h
+                      <Text style={[commonStyles.body, styles.entryDescription]}>
+                        {entry.description || 'No description'}
                       </Text>
                     </View>
-                    <Text style={[styles.entryProject, { color: colors.textSecondary }]}>
-                      {entry.staff?.name || 'Unknown Staff'}
-                    </Text>
-                    <Text style={[styles.entryDescription, { color: colors.text }]}>
-                      {entry.description || 'No description'}
-                    </Text>
-                  </View>
+                  </Animated.View>
                 ))}
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* Month Picker Modal */}
         <Modal visible={showMonthPicker} animationType="slide" presentationStyle="pageSheet">
-          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <BlurView intensity={100} style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Month</Text>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Month</Text>
               <Pressable onPress={() => setShowMonthPicker(false)}>
                 <IconSymbol name="xmark" color={colors.text} size={24} />
               </Pressable>
             </View>
             <ScrollView style={styles.modalContent}>
               <View style={styles.yearSection}>
-                <Text style={[styles.yearTitle, { color: colors.text }]}>Year: {currentYear}</Text>
-                <Text style={[styles.yearSubtitle, { color: colors.textSecondary }]}>
+                <Text style={[commonStyles.heading4, { color: colors.text }]}>Year: {currentYear}</Text>
+                <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>
                   Only current year data is available
                 </Text>
               </View>
@@ -723,7 +785,7 @@ export default function AdminDashboard() {
                     key={index}
                     style={[
                       styles.monthButton,
-                      { backgroundColor: colors.card },
+                      commonStyles.cardElevated,
                       selectedMonth === index && { backgroundColor: colors.primary }
                     ]}
                     onPress={() => {
@@ -735,7 +797,7 @@ export default function AdminDashboard() {
                   >
                     <Text
                       style={[
-                        styles.monthButtonText,
+                        commonStyles.bodyMedium,
                         { color: colors.text },
                         selectedMonth === index && { color: 'white' }
                       ]}
@@ -746,7 +808,7 @@ export default function AdminDashboard() {
                 ))}
               </View>
             </ScrollView>
-          </View>
+          </BlurView>
         </Modal>
       </ScrollView>
     );
@@ -756,9 +818,12 @@ export default function AdminDashboard() {
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       {renderDashboardStats()}
       
-      <View style={styles.section}>
+      <Animated.View 
+        style={styles.section}
+        entering={FadeInDown.delay(100).springify()}
+      >
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Management</Text>
+          <Text style={[commonStyles.heading3, styles.sectionTitle]}>Staff Management</Text>
           <View style={styles.headerActions}>
             <Pressable
               style={[styles.importButton, { backgroundColor: colors.secondary }]}
@@ -781,11 +846,14 @@ export default function AdminDashboard() {
           keyExtractor={(item) => item.id}
           scrollEnabled={false}
         />
-      </View>
+      </Animated.View>
 
-      <View style={styles.section}>
+      <Animated.View 
+        style={styles.section}
+        entering={FadeInDown.delay(200).springify()}
+      >
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Department Management</Text>
+          <Text style={[commonStyles.heading3, styles.sectionTitle]}>Department Management</Text>
           <Pressable
             style={[styles.addButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowAddDepartmentModal(true)}
@@ -799,24 +867,24 @@ export default function AdminDashboard() {
           keyExtractor={(item) => item.id}
           scrollEnabled={false}
         />
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 
   const renderAddStaffModal = () => (
     <Modal visible={showAddStaffModal} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+      <BlurView intensity={100} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Staff Member</Text>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Add Staff Member</Text>
           <Pressable onPress={() => setShowAddStaffModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.input]}
               value={newStaffName}
               onChangeText={setNewStaffName}
               placeholder="Enter staff name"
@@ -824,19 +892,19 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Status</Text>
             <View style={styles.statusContainer}>
               <Pressable
                 style={[
                   styles.statusOption,
-                  { backgroundColor: colors.card },
-                  newStaffStatus === "active" && { backgroundColor: colors.primary }
+                  commonStyles.cardElevated,
+                  newStaffStatus === "active" && { backgroundColor: colors.success }
                 ]}
                 onPress={() => setNewStaffStatus("active")}
               >
                 <Text
                   style={[
-                    styles.statusOptionText,
+                    commonStyles.bodyMedium,
                     { color: colors.text },
                     newStaffStatus === "active" && { color: "white" }
                   ]}
@@ -847,14 +915,14 @@ export default function AdminDashboard() {
               <Pressable
                 style={[
                   styles.statusOption,
-                  { backgroundColor: colors.card },
-                  newStaffStatus === "inactive" && { backgroundColor: colors.accent }
+                  commonStyles.cardElevated,
+                  newStaffStatus === "inactive" && { backgroundColor: colors.error }
                 ]}
                 onPress={() => setNewStaffStatus("inactive")}
               >
                 <Text
                   style={[
-                    styles.statusOptionText,
+                    commonStyles.bodyMedium,
                     { color: colors.text },
                     newStaffStatus === "inactive" && { color: "white" }
                   ]}
@@ -868,27 +936,27 @@ export default function AdminDashboard() {
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
             onPress={addStaff}
           >
-            <Text style={styles.submitButtonText}>Add Staff Member</Text>
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Add Staff Member</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </BlurView>
     </Modal>
   );
 
   const renderEditStaffModal = () => (
     <Modal visible={showEditStaffModal} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+      <BlurView intensity={100} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Staff Member</Text>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Edit Staff Member</Text>
           <Pressable onPress={() => setShowEditStaffModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.input]}
               value={editStaffName}
               onChangeText={setEditStaffName}
               placeholder="Enter staff name"
@@ -896,19 +964,19 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Status</Text>
             <View style={styles.statusContainer}>
               <Pressable
                 style={[
                   styles.statusOption,
-                  { backgroundColor: colors.card },
-                  editStaffStatus === "active" && { backgroundColor: colors.primary }
+                  commonStyles.cardElevated,
+                  editStaffStatus === "active" && { backgroundColor: colors.success }
                 ]}
                 onPress={() => setEditStaffStatus("active")}
               >
                 <Text
                   style={[
-                    styles.statusOptionText,
+                    commonStyles.bodyMedium,
                     { color: colors.text },
                     editStaffStatus === "active" && { color: "white" }
                   ]}
@@ -919,14 +987,14 @@ export default function AdminDashboard() {
               <Pressable
                 style={[
                   styles.statusOption,
-                  { backgroundColor: colors.card },
-                  editStaffStatus === "inactive" && { backgroundColor: colors.accent }
+                  commonStyles.cardElevated,
+                  editStaffStatus === "inactive" && { backgroundColor: colors.error }
                 ]}
                 onPress={() => setEditStaffStatus("inactive")}
               >
                 <Text
                   style={[
-                    styles.statusOptionText,
+                    commonStyles.bodyMedium,
                     { color: colors.text },
                     editStaffStatus === "inactive" && { color: "white" }
                   ]}
@@ -940,27 +1008,27 @@ export default function AdminDashboard() {
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
             onPress={editStaff}
           >
-            <Text style={styles.submitButtonText}>Update Staff Member</Text>
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Update Staff Member</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </BlurView>
     </Modal>
   );
 
   const renderAddDepartmentModal = () => (
     <Modal visible={showAddDepartmentModal} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+      <BlurView intensity={100} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Department</Text>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Add Department</Text>
           <Pressable onPress={() => setShowAddDepartmentModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department Name</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Department Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.input]}
               value={newDepartmentName}
               onChangeText={setNewDepartmentName}
               placeholder="Enter department name"
@@ -968,9 +1036,9 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Description</Text>
             <TextInput
-              style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.textArea]}
               value={newDepartmentDescription}
               onChangeText={setNewDepartmentDescription}
               placeholder="Enter department description"
@@ -983,27 +1051,27 @@ export default function AdminDashboard() {
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
             onPress={addDepartment}
           >
-            <Text style={styles.submitButtonText}>Add Department</Text>
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Add Department</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </BlurView>
     </Modal>
   );
 
   const renderEditDepartmentModal = () => (
     <Modal visible={showEditDepartmentModal} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+      <BlurView intensity={100} style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Department</Text>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Edit Department</Text>
           <Pressable onPress={() => setShowEditDepartmentModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department Name</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Department Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.input]}
               value={editDepartmentName}
               onChangeText={setEditDepartmentName}
               placeholder="Enter department name"
@@ -1011,9 +1079,9 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Description</Text>
             <TextInput
-              style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              style={[commonStyles.input, styles.textArea]}
               value={editDepartmentDescription}
               onChangeText={setEditDepartmentDescription}
               placeholder="Enter department description"
@@ -1026,10 +1094,10 @@ export default function AdminDashboard() {
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
             onPress={editDepartment}
           >
-            <Text style={styles.submitButtonText}>Update Department</Text>
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Update Department</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </BlurView>
     </Modal>
   );
 
@@ -1055,54 +1123,78 @@ export default function AdminDashboard() {
             ),
           }}
         />
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <View style={styles.loginContainer}>
-            <Text style={[styles.loginTitle, { color: colors.text }]}>Admin Login</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Username</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter username"
-                autoCapitalize="none"
-                placeholderTextColor={colors.textSecondary}
-              />
+        <LinearGradient
+          colors={[colors.background, colors.backgroundSecondary]}
+          style={styles.container}
+        >
+          <Animated.View 
+            style={styles.loginContainer}
+            entering={FadeInUp.springify()}
+          >
+            <View style={styles.loginHeader}>
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                style={styles.loginIcon}
+              >
+                <IconSymbol name="lock.fill" color="white" size={32} />
+              </LinearGradient>
+              <Text style={[commonStyles.heading2, styles.loginTitle]}>Admin Login</Text>
+              <Text style={[commonStyles.body, styles.loginSubtitle]}>
+                Enter your credentials to access the dashboard
+              </Text>
             </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-              <View style={styles.passwordContainer}>
+            
+            <View style={styles.loginForm}>
+              <View style={styles.inputGroup}>
+                <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Username</Text>
                 <TextInput
-                  style={[styles.passwordInput, { backgroundColor: colors.card, color: colors.text }]}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter password"
-                  secureTextEntry={!showPassword}
+                  style={[commonStyles.input, styles.input]}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Enter username"
+                  autoCapitalize="none"
                   placeholderTextColor={colors.textSecondary}
                 />
-                <Pressable
-                  style={styles.passwordToggle}
-                  onPress={togglePasswordVisibility}
-                >
-                  <IconSymbol
-                    name={showPassword ? "eye.slash" : "eye"}
-                    color={colors.textSecondary}
-                    size={20}
-                  />
-                </Pressable>
               </View>
-            </View>
 
-            <Pressable
-              style={[styles.loginButton, { backgroundColor: colors.primary }]}
-              onPress={handleLogin}
-            >
-              <Text style={styles.loginButtonText}>Login</Text>
-            </Pressable>
-          </View>
-        </View>
+              <View style={styles.inputGroup}>
+                <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Password</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[commonStyles.input, styles.passwordInput]}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter password"
+                    secureTextEntry={!showPassword}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Pressable
+                    style={styles.passwordToggle}
+                    onPress={togglePasswordVisibility}
+                  >
+                    <IconSymbol
+                      name={showPassword ? "eye.slash" : "eye"}
+                      color={colors.textSecondary}
+                      size={20}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.loginButton, { backgroundColor: colors.primary }]}
+                onPress={handleLogin}
+              >
+                <LinearGradient
+                  colors={[colors.primary, '#6366F1']}
+                  style={styles.loginButtonGradient}
+                >
+                  <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Login</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </LinearGradient>
       </>
     );
   }
@@ -1123,12 +1215,15 @@ export default function AdminDashboard() {
           ),
           headerRight: () => (
             <Pressable onPress={handleLogout} style={styles.logoutButton}>
-              <Text style={[styles.logoutText, { color: colors.accent }]}>Logout</Text>
+              <Text style={[commonStyles.bodyMedium, { color: colors.error }]}>Logout</Text>
             </Pressable>
           ),
         }}
       />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.background, colors.backgroundSecondary]}
+        style={styles.container}
+      >
         {/* Tab Content */}
         <View style={styles.tabContent}>
           {activeTab === 0 ? renderDashboardContent() : renderOverviewContent()}
@@ -1136,7 +1231,7 @@ export default function AdminDashboard() {
 
         {/* Custom Tab Bar */}
         <View style={styles.customTabBar}>
-          <View style={[styles.tabBarContainer, { backgroundColor: colors.card }]}>
+          <BlurView intensity={100} style={styles.tabBarContainer}>
             <Pressable
               style={[
                 styles.tabButton,
@@ -1151,7 +1246,7 @@ export default function AdminDashboard() {
               />
               <Text
                 style={[
-                  styles.tabButtonText,
+                  commonStyles.captionMedium,
                   { color: activeTab === 0 ? "white" : colors.text }
                 ]}
               >
@@ -1172,21 +1267,21 @@ export default function AdminDashboard() {
               />
               <Text
                 style={[
-                  styles.tabButtonText,
+                  commonStyles.captionMedium,
                   { color: activeTab === 1 ? "white" : colors.text }
                 ]}
               >
                 Overview
               </Text>
             </Pressable>
-          </View>
+          </BlurView>
         </View>
 
         {renderAddStaffModal()}
         {renderEditStaffModal()}
         {renderAddDepartmentModal()}
         {renderEditDepartmentModal()}
-      </View>
+      </LinearGradient>
     </>
   );
 }
@@ -1199,394 +1294,174 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100, // Add padding to account for tab bar
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 120, // Add padding to account for tab bar
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8,
+    padding: spacing.sm,
+    marginLeft: -spacing.sm,
   },
   logoutButton: {
-    padding: 8,
-    marginRight: -8,
+    padding: spacing.sm,
+    marginRight: -spacing.sm,
   },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  
+  // Login Styles
   loginContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xl,
+  },
+  loginHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
+  },
+  loginIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.lg,
   },
   loginTitle: {
-    fontSize: 28,
-    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: spacing.sm,
+  },
+  loginSubtitle: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+  },
+  loginForm: {
+    gap: spacing.lg,
   },
   inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    gap: spacing.sm,
   },
   input: {
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    minHeight: 48,
+    ...shadows.sm,
   },
   passwordContainer: {
     position: 'relative',
   },
   passwordInput: {
-    borderRadius: 12,
-    padding: 16,
     paddingRight: 50,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    minHeight: 48,
+    ...shadows.sm,
   },
   passwordToggle: {
     position: 'absolute',
-    right: 16,
-    top: 14,
-    padding: 4,
+    right: spacing.md,
+    top: spacing.md,
+    padding: spacing.xs,
   },
   textArea: {
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
     minHeight: 120,
     textAlignVertical: 'top',
+    ...shadows.sm,
   },
   loginButton: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+    ...shadows.md,
+  },
+  loginButtonGradient: {
+    padding: spacing.md,
     alignItems: 'center',
-    marginTop: 20,
     minHeight: 48,
+    justifyContent: 'center',
   },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  
+  // Stats Styles
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 12,
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   statCard: {
     flex: 1,
-    padding: 16,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  statGradient: {
+    padding: spacing.lg,
     alignItems: 'center',
+    gap: spacing.sm,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: typography['2xl'],
+    fontWeight: typography.bold,
     color: 'white',
+    fontFamily: 'Inter_700Bold',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: typography.xs,
     color: 'white',
-    marginTop: 4,
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
   },
+  
+  // Section Styles
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    flex: 1,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
     alignItems: 'center',
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    ...shadows.sm,
   },
   importButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
+    ...shadows.sm,
   },
   importButtonText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: typography.sm,
+    fontWeight: typography.semibold,
+    fontFamily: 'Inter_600SemiBold',
   },
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+  
+  // Card Styles
+  staffCard: {
+    marginBottom: spacing.md,
+  },
+  departmentCard: {
+    marginBottom: spacing.md,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  staffInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 16,
-  },
-  submitButton: {
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 20,
-    minHeight: 48,
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Custom Tab Bar Styles
-  customTabBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 10,
-  },
-  tabBarContainer: {
-    flexDirection: 'row',
-    borderRadius: 25,
-    padding: 8,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
-    elevation: 8,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 17,
-    gap: 8,
-  },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Overview Styles
-  overviewHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  overviewTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  overviewSubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  overviewStatsSection: {
-    marginBottom: 32,
-  },
-  overviewStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  overviewStatCard: {
-    flex: 1,
-    minWidth: '45%',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  statTitle: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  entriesSection: {
-    marginBottom: 32,
-  },
-  entriesList: {
-    gap: 12,
-  },
-  entryCard: {
-    borderRadius: 16,
-    padding: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  entryDate: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  entryHours: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  entryProject: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  entryDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  // New styles for work overview
-  filterSection: {
-    marginBottom: 24,
-  },
-  monthPicker: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  monthPickerText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  staffHoursSection: {
-    marginBottom: 32,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-    borderRadius: 16,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  staffHoursList: {
-    gap: 12,
-  },
-  staffHourCard: {
-    borderRadius: 16,
-    padding: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  staffHourHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
   },
   staffAvatar: {
     width: 48,
@@ -1594,28 +1469,234 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
+  },
+  staffDetails: {
+    flex: 1,
+  },
+  staffName: {
+    marginBottom: spacing.xs,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  departmentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  departmentIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  departmentDetails: {
+    flex: 1,
+  },
+  departmentName: {
+    marginBottom: spacing.xs,
+  },
+  departmentDescription: {
+    lineHeight: 18,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalContent: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  submitButton: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    minHeight: 48,
+    ...shadows.sm,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  statusOption: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  
+  // Custom Tab Bar Styles
+  customTabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.xl,
+    padding: spacing.sm,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    gap: spacing.sm,
+  },
+  
+  // Overview Styles
+  overviewHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  overviewIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.lg,
+  },
+  overviewTitle: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  overviewSubtitle: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    maxWidth: 280,
+  },
+  filterSection: {
+    marginBottom: spacing.xl,
+  },
+  monthPicker: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  overviewStatsSection: {
+    marginBottom: spacing.xl,
+  },
+  overviewStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  overviewStatCard: {
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  staffHoursSection: {
+    marginBottom: spacing.xl,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: spacing.xl,
+    marginTop: spacing.md,
+  },
+  emptyStateText: {
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  emptyStateSubtext: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  staffHoursList: {
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  staffHourCard: {
+    padding: spacing.lg,
+  },
+  staffHourHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  staffHourAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
   staffAvatarText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    fontFamily: 'Inter_700Bold',
   },
   staffHourInfo: {
     flex: 1,
   },
   staffHourName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  staffHourHours: {
-    fontSize: 14,
-    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
   staffHourProgress: {
     height: 6,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: colors.border,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -1623,52 +1704,48 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  entriesSection: {
+    marginBottom: spacing.xl,
+  },
+  entriesList: {
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  entryCard: {
+    padding: spacing.lg,
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  hoursBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  entryProject: {
+    marginBottom: spacing.xs,
+  },
+  entryDescription: {
+    lineHeight: 22,
+  },
   yearSection: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-  },
-  yearTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  yearSubtitle: {
-    fontSize: 14,
+    marginBottom: spacing.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
   },
   monthGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.md,
   },
   monthButton: {
     flex: 1,
     minWidth: '45%',
-    padding: 16,
-    borderRadius: 12,
+    padding: spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  monthButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statusOption: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  statusOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

@@ -3,45 +3,62 @@ import React from "react";
 import { ScrollView, Pressable, StyleSheet, View, Text, Platform } from "react-native";
 import { IconSymbol } from "@/components/IconSymbol";
 import { Link, Stack } from "expo-router";
-import { colors } from "@/styles/commonStyles";
+import { colors, spacing, borderRadius, shadows, typography, commonStyles } from "@/styles/commonStyles";
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 export default function HomeScreen() {
   const menuOptions = [
     {
       title: "Register work day",
-      description: "Log your daily work activities",
+      description: "Log your daily work activities and track progress",
       route: "/register",
       icon: "calendar.badge.plus",
-      color: colors.primary,
+      gradient: [colors.primary, '#6366F1'],
+      iconBg: colors.primaryLight,
     },
     {
       title: "Admin login",
-      description: "Administrative access",
+      description: "Access administrative dashboard and settings",
       route: "/admin",
       icon: "person.badge.key.fill",
-      color: colors.accent,
+      gradient: [colors.secondary, '#059669'],
+      iconBg: colors.secondaryLight,
     }
   ];
 
   const renderMenuOption = (item: typeof menuOptions[0], index: number) => (
-    <Link href={item.route as any} asChild key={item.route}>
-      <Pressable style={({ pressed }) => [
-        styles.optionCard,
-        { backgroundColor: colors.card },
-        pressed && styles.optionCardPressed
-      ]}>
-        <View style={[styles.optionIcon, { backgroundColor: item.color }]}>
-          <IconSymbol name={item.icon as any} color="white" size={28} />
-        </View>
-        <View style={styles.optionContent}>
-          <Text style={[styles.optionTitle, { color: colors.text }]}>{item.title}</Text>
-          <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{item.description}</Text>
-        </View>
-        <View style={styles.chevronContainer}>
-          <IconSymbol name="chevron.right" color={colors.textSecondary} size={20} />
-        </View>
-      </Pressable>
-    </Link>
+    <Animated.View
+      key={item.route}
+      entering={FadeInDown.delay(index * 100).springify()}
+    >
+      <Link href={item.route as any} asChild>
+        <Pressable style={({ pressed }) => [
+          styles.optionCard,
+          pressed && styles.optionCardPressed
+        ]}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
+            style={styles.cardGradient}
+          >
+            <View style={styles.optionContent}>
+              <View style={[styles.optionIconContainer, { backgroundColor: item.iconBg }]}>
+                <IconSymbol name={item.icon as any} color={item.gradient[0]} size={32} />
+              </View>
+              <View style={styles.optionTextContainer}>
+                <Text style={[commonStyles.heading4, styles.optionTitle]}>{item.title}</Text>
+                <Text style={[commonStyles.caption, styles.optionDescription]}>{item.description}</Text>
+              </View>
+              <View style={styles.chevronContainer}>
+                <View style={[styles.chevronBg, { backgroundColor: item.gradient[0] + '20' }]}>
+                  <IconSymbol name="chevron.right" color={item.gradient[0]} size={20} />
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </Pressable>
+      </Link>
+    </Animated.View>
   );
 
   return (
@@ -53,26 +70,60 @@ export default function HomeScreen() {
             backgroundColor: colors.background,
           },
           headerTintColor: colors.text,
-          headerShown: true,
+          headerShown: false,
         }}
       />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.background, colors.backgroundSecondary]}
+        style={styles.container}
+      >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome</Text>
-            <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
-              Choose an option to get started
+          <Animated.View 
+            style={styles.header}
+            entering={FadeInUp.springify()}
+          >
+            <View style={styles.headerIcon}>
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                style={styles.headerIconGradient}
+              >
+                <IconSymbol name="briefcase.fill" color="white" size={40} />
+              </LinearGradient>
+            </View>
+            <Text style={[commonStyles.heading1, styles.welcomeTitle]}>Work Tracker</Text>
+            <Text style={[commonStyles.body, styles.welcomeSubtitle]}>
+              Streamline your workflow and boost productivity
             </Text>
-          </View>
+          </Animated.View>
           
           <View style={styles.optionsContainer}>
             {menuOptions.map((item, index) => renderMenuOption(item, index))}
           </View>
+
+          <Animated.View 
+            style={styles.footer}
+            entering={FadeInUp.delay(300).springify()}
+          >
+            <View style={styles.featureList}>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.primary }]} />
+                <Text style={[commonStyles.caption, styles.featureText]}>Track daily work hours</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.secondary }]} />
+                <Text style={[commonStyles.caption, styles.featureText]}>Manage staff and departments</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.accent }]} />
+                <Text style={[commonStyles.caption, styles.featureText]}>Generate detailed reports</Text>
+              </View>
+            </View>
+          </Animated.View>
         </ScrollView>
-      </View>
+      </LinearGradient>
     </>
   );
 }
@@ -82,63 +133,102 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.lg,
     flexGrow: 1,
+    justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
-    paddingTop: 20,
+    marginBottom: spacing.xxl,
+  },
+  headerIcon: {
+    marginBottom: spacing.lg,
+  },
+  headerIconGradient: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.lg,
   },
   welcomeTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   welcomeSubtitle: {
-    fontSize: 16,
     textAlign: 'center',
+    color: colors.textSecondary,
+    maxWidth: 280,
   },
   optionsContainer: {
-    gap: 16,
-    flex: 1,
-    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   optionCard: {
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-    minHeight: 80,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  cardGradient: {
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   optionCardPressed: {
-    opacity: 0.8,
+    opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  optionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  optionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  optionIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing.md,
   },
-  optionContent: {
+  optionTextContainer: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   optionDescription: {
-    fontSize: 14,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   chevronContainer: {
-    marginLeft: 8,
+    marginLeft: spacing.sm,
+  },
+  chevronBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footer: {
+    alignItems: 'center',
+  },
+  featureList: {
+    gap: spacing.md,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  featureDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  featureText: {
+    color: colors.textSecondary,
   },
 });

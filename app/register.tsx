@@ -1,33 +1,45 @@
 
-import { Stack, router } from "expo-router";
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList } from "react-native";
-import { IconSymbol } from "@/components/IconSymbol";
-import { colors } from "@/styles/commonStyles";
-import { supabase } from "@/app/integrations/supabase/client";
 import { Tables } from "@/app/integrations/supabase/types";
+import React, { useState, useEffect } from "react";
+import { colors, spacing, borderRadius, shadows, typography, commonStyles } from "@/styles/commonStyles";
+import { supabase } from "@/app/integrations/supabase/client";
+import { IconSymbol } from "@/components/IconSymbol";
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList } from "react-native";
+import { Stack, router } from "expo-router";
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Staff = Tables<"staff">;
 type Department = Tables<"departments">;
 
 const WORK_TYPES = [
-  "Regular class",
-  "Shimsa", 
-  "Events"
+  "Development",
+  "Design",
+  "Testing",
+  "Documentation",
+  "Meeting",
+  "Research",
+  "Planning",
+  "Review",
+  "Training",
+  "Support",
+  "Other"
 ];
 
 export default function RegisterWorkDay() {
-  const [workHours, setWorkHours] = useState('');
-  const [workType, setWorkType] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [departmentList, setDepartmentList] = useState<Department[]>([]);
-  const [showStaffPicker, setShowStaffPicker] = useState(false);
-  const [showDepartmentPicker, setShowDepartmentPicker] = useState(false);
-  const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedWorkType, setSelectedWorkType] = useState<string>("");
+  const [hours, setHours] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [showWorkTypeModal, setShowWorkTypeModal] = useState(false);
 
   useEffect(() => {
     fetchStaff();
@@ -52,37 +64,26 @@ export default function RegisterWorkDay() {
     try {
       const { data, error } = await supabase
         .from("departments")
-        .select("*")
-        .order("name");
+        .select("*");
 
       if (error) throw error;
-      setDepartmentList(data || []);
+      setDepartments(data || []);
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
   };
 
   const handleSubmit = async () => {
-    const currentYear = new Date().getFullYear();
-    const entryYear = new Date(date).getFullYear();
-
-    if (!workHours || !workType || !selectedStaff || !selectedDepartment) {
-      Alert.alert('Error', 'Please fill in all required fields: staff member, department, work hours, and type of work');
+    if (!selectedStaff || !selectedDepartment || !selectedWorkType || !hours) {
+      Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
-    if (entryYear !== currentYear) {
-      Alert.alert('Error', `Work entries can only be registered for the current year (${currentYear})`);
+    const hoursFloat = parseFloat(hours);
+    if (isNaN(hoursFloat) || hoursFloat <= 0) {
+      Alert.alert("Error", "Please enter a valid number of hours");
       return;
     }
-
-    const hours = parseFloat(workHours);
-    if (isNaN(hours) || hours <= 0 || hours > 24) {
-      Alert.alert('Error', 'Please enter valid work hours (0-24)');
-      return;
-    }
-
-    setIsSubmitting(true);
 
     try {
       const { error } = await supabase
@@ -91,30 +92,102 @@ export default function RegisterWorkDay() {
           {
             staff_id: selectedStaff.id,
             department_id: selectedDepartment.id,
-            date: date,
-            hours: hours,
-            work_type: workType,
+            date: date.toISOString().split('T')[0],
+            hours: hoursFloat,
+            description: selectedWorkType,
           },
         ]);
 
       if (error) throw error;
 
-      Alert.alert(
-        'Success', 
-        'Work day registered successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back()
-          }
-        ]
-      );
+      Alert.alert("Success", "Work day registered successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            // Reset form
+            setSelectedStaff(null);
+            setSelectedDepartment(null);
+            setSelectedWorkType("");
+            setHours("");
+            setDate(new Date());
+          },
+        },
+      ]);
     } catch (error: any) {
       Alert.alert("Error", error.message);
-    } finally {
-      setIsSubmitting(false);
     }
   };
+
+  const renderStaffItem = ({ item, index }: { item: Staff; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+    >
+      <Pressable
+        style={[styles.modalItem, commonStyles.cardElevated]}
+        onPress={() => {
+          setSelectedStaff(item);
+          setShowStaffModal(false);
+        }}
+      >
+        <View style={[styles.staffAvatar, { backgroundColor: colors.primary + '20' }]}>
+          <Text style={[commonStyles.bodyMedium, { color: colors.primary }]}>
+            {item.name?.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>{item.name}</Text>
+        {selectedStaff?.id === item.id && (
+          <IconSymbol name="checkmark.circle.fill" color={colors.success} size={24} />
+        )}
+      </Pressable>
+    </Animated.View>
+  );
+
+  const renderDepartmentItem = ({ item, index }: { item: Department; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+    >
+      <Pressable
+        style={[styles.modalItem, commonStyles.cardElevated]}
+        onPress={() => {
+          setSelectedDepartment(item);
+          setShowDepartmentModal(false);
+        }}
+      >
+        <View style={[styles.departmentIcon, { backgroundColor: colors.secondary + '20' }]}>
+          <IconSymbol name="building.2" color={colors.secondary} size={20} />
+        </View>
+        <View style={styles.departmentInfo}>
+          <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>{item.description}</Text>
+        </View>
+        {selectedDepartment?.id === item.id && (
+          <IconSymbol name="checkmark.circle.fill" color={colors.success} size={24} />
+        )}
+      </Pressable>
+    </Animated.View>
+  );
+
+  const renderWorkTypeItem = ({ item, index }: { item: string; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 30).springify()}
+    >
+      <Pressable
+        style={[styles.workTypeItem, commonStyles.cardElevated]}
+        onPress={() => {
+          setSelectedWorkType(item);
+          setShowWorkTypeModal(false);
+        }}
+      >
+        <View style={[styles.workTypeIcon, { backgroundColor: colors.accent + '20' }]}>
+          <IconSymbol name="briefcase" color={colors.accent} size={20} />
+        </View>
+        <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>{item}</Text>
+        {selectedWorkType === item && (
+          <IconSymbol name="checkmark.circle.fill" color={colors.success} size={24} />
+        )}
+      </Pressable>
+    </Animated.View>
+  );
 
   return (
     <>
@@ -132,265 +205,254 @@ export default function RegisterWorkDay() {
           ),
         }}
       />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.background, colors.backgroundSecondary]}
+        style={styles.container}
+      >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Staff Member *</Text>
-              <Pressable
-                style={[styles.input, { backgroundColor: colors.card }]}
-                onPress={() => setShowStaffPicker(true)}
-              >
-                <Text style={[styles.inputText, { color: selectedStaff ? colors.text : colors.textSecondary }]}>
-                  {selectedStaff ? selectedStaff.name : 'Select staff member'}
-                </Text>
-                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
-              </Pressable>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Department *</Text>
-              <Pressable
-                style={[styles.input, { backgroundColor: colors.card }]}
-                onPress={() => setShowDepartmentPicker(true)}
-              >
-                <Text style={[styles.inputText, { color: selectedDepartment ? colors.text : colors.textSecondary }]}>
-                  {selectedDepartment ? selectedDepartment.name : 'Select department'}
-                </Text>
-                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
-              </Pressable>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Date *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                Only current year ({new Date().getFullYear()}) entries are allowed
-              </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Work Hours *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                value={workHours}
-                onChangeText={setWorkHours}
-                placeholder="8.0"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                Enter hours worked (0-24)
-              </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Types of work *</Text>
-              <Pressable
-                style={[styles.input, { backgroundColor: colors.card }]}
-                onPress={() => setShowWorkTypePicker(true)}
-              >
-                <Text style={[styles.inputText, { color: workType ? colors.text : colors.textSecondary }]}>
-                  {workType || 'Select type of work'}
-                </Text>
-                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={[
-                styles.submitButton, 
-                { 
-                  backgroundColor: isSubmitting ? colors.textSecondary : colors.primary,
-                  opacity: isSubmitting ? 0.7 : 1
-                }
-              ]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
+          <Animated.View 
+            style={styles.header}
+            entering={FadeInUp.springify()}
+          >
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              style={styles.headerIcon}
             >
-              <Text style={styles.submitButtonText}>
-                {isSubmitting ? 'Registering...' : 'Register Work Day'}
-              </Text>
-            </Pressable>
+              <IconSymbol name="calendar.badge.plus" color="white" size={32} />
+            </LinearGradient>
+            <Text style={[commonStyles.heading2, styles.title]}>Register Work Day</Text>
+            <Text style={[commonStyles.body, styles.subtitle]}>
+              Log your daily work activities and track your progress
+            </Text>
+          </Animated.View>
+
+          <View style={styles.form}>
+            {/* Staff Selection */}
+            <Animated.View 
+              style={styles.inputGroup}
+              entering={FadeInDown.delay(100).springify()}
+            >
+              <Text style={[commonStyles.bodyMedium, styles.label]}>Staff Member *</Text>
+              <Pressable
+                style={[styles.selector, commonStyles.cardElevated]}
+                onPress={() => setShowStaffModal(true)}
+              >
+                {selectedStaff ? (
+                  <View style={styles.selectedItem}>
+                    <View style={[styles.staffAvatar, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[commonStyles.captionMedium, { color: colors.primary }]}>
+                        {selectedStaff.name?.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                      {selectedStaff.name}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[commonStyles.body, { color: colors.textSecondary }]}>
+                    Select staff member
+                  </Text>
+                )}
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
+            </Animated.View>
+
+            {/* Department Selection */}
+            <Animated.View 
+              style={styles.inputGroup}
+              entering={FadeInDown.delay(200).springify()}
+            >
+              <Text style={[commonStyles.bodyMedium, styles.label]}>Department *</Text>
+              <Pressable
+                style={[styles.selector, commonStyles.cardElevated]}
+                onPress={() => setShowDepartmentModal(true)}
+              >
+                {selectedDepartment ? (
+                  <View style={styles.selectedItem}>
+                    <View style={[styles.departmentIcon, { backgroundColor: colors.secondary + '20' }]}>
+                      <IconSymbol name="building.2" color={colors.secondary} size={16} />
+                    </View>
+                    <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                      {selectedDepartment.name}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[commonStyles.body, { color: colors.textSecondary }]}>
+                    Select department
+                  </Text>
+                )}
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
+            </Animated.View>
+
+            {/* Work Type Selection */}
+            <Animated.View 
+              style={styles.inputGroup}
+              entering={FadeInDown.delay(300).springify()}
+            >
+              <Text style={[commonStyles.bodyMedium, styles.label]}>Type of Work *</Text>
+              <Pressable
+                style={[styles.selector, commonStyles.cardElevated]}
+                onPress={() => setShowWorkTypeModal(true)}
+              >
+                {selectedWorkType ? (
+                  <View style={styles.selectedItem}>
+                    <View style={[styles.workTypeIcon, { backgroundColor: colors.accent + '20' }]}>
+                      <IconSymbol name="briefcase" color={colors.accent} size={16} />
+                    </View>
+                    <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                      {selectedWorkType}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[commonStyles.body, { color: colors.textSecondary }]}>
+                    Select work type
+                  </Text>
+                )}
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
+            </Animated.View>
+
+            {/* Date Selection */}
+            <Animated.View 
+              style={styles.inputGroup}
+              entering={FadeInDown.delay(400).springify()}
+            >
+              <Text style={[commonStyles.bodyMedium, styles.label]}>Date *</Text>
+              <Pressable
+                style={[styles.selector, commonStyles.cardElevated]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <View style={styles.selectedItem}>
+                  <View style={[styles.dateIcon, { backgroundColor: colors.primary + '20' }]}>
+                    <IconSymbol name="calendar" color={colors.primary} size={16} />
+                  </View>
+                  <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                    {date.toLocaleDateString()}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
+            </Animated.View>
+
+            {/* Hours Input */}
+            <Animated.View 
+              style={styles.inputGroup}
+              entering={FadeInDown.delay(500).springify()}
+            >
+              <Text style={[commonStyles.bodyMedium, styles.label]}>Hours Worked *</Text>
+              <View style={[styles.hoursInputContainer, commonStyles.cardElevated]}>
+                <View style={[styles.hoursIcon, { backgroundColor: colors.accent + '20' }]}>
+                  <IconSymbol name="clock" color={colors.accent} size={16} />
+                </View>
+                <TextInput
+                  style={[commonStyles.body, styles.hoursInput]}
+                  value={hours}
+                  onChangeText={setHours}
+                  placeholder="0.0"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>hours</Text>
+              </View>
+            </Animated.View>
+
+            {/* Submit Button */}
+            <Animated.View 
+              entering={FadeInDown.delay(600).springify()}
+            >
+              <Pressable
+                style={[styles.submitButton, { opacity: selectedStaff && selectedDepartment && selectedWorkType && hours ? 1 : 0.6 }]}
+                onPress={handleSubmit}
+                disabled={!selectedStaff || !selectedDepartment || !selectedWorkType || !hours}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.secondary]}
+                  style={styles.submitGradient}
+                >
+                  <IconSymbol name="checkmark.circle.fill" color="white" size={20} />
+                  <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Register Work Day</Text>
+                </LinearGradient>
+              </Pressable>
+            </Animated.View>
           </View>
         </ScrollView>
 
-        {/* Staff Picker Modal */}
-        <Modal visible={showStaffPicker} animationType="slide" presentationStyle="pageSheet">
-          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Date Picker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                setDate(selectedDate);
+              }
+            }}
+          />
+        )}
+
+        {/* Staff Modal */}
+        <Modal visible={showStaffModal} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Staff Member</Text>
-              <Pressable onPress={() => setShowStaffPicker(false)}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Staff Member</Text>
+              <Pressable onPress={() => setShowStaffModal(false)}>
                 <IconSymbol name="xmark" color={colors.text} size={24} />
               </Pressable>
             </View>
             <FlatList
               data={staffList}
+              renderItem={renderStaffItem}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.staffItem,
-                    { backgroundColor: colors.card },
-                    selectedStaff?.id === item.id && { backgroundColor: colors.primary }
-                  ]}
-                  onPress={() => {
-                    setSelectedStaff(item);
-                    setShowStaffPicker(false);
-                  }}
-                >
-                  <View style={[styles.staffAvatar, { backgroundColor: colors.secondary }]}>
-                    <Text style={styles.staffAvatarText}>
-                      {item.name?.charAt(0).toUpperCase() || 'S'}
-                    </Text>
-                  </View>
-                  <View style={styles.staffInfo}>
-                    <Text
-                      style={[
-                        styles.staffName,
-                        { color: selectedStaff?.id === item.id ? 'white' : colors.text }
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.staffEmail,
-                        { color: selectedStaff?.id === item.id ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
-                      ]}
-                    >
-                      {item.email}
-                    </Text>
-                  </View>
-                  {selectedStaff?.id === item.id && (
-                    <IconSymbol name="checkmark" color="white" size={20} />
-                  )}
-                </Pressable>
-              )}
-              contentContainerStyle={styles.staffList}
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
             />
-          </View>
+          </BlurView>
         </Modal>
 
-        {/* Department Picker Modal */}
-        <Modal visible={showDepartmentPicker} animationType="slide" presentationStyle="pageSheet">
-          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Department Modal */}
+        <Modal visible={showDepartmentModal} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Department</Text>
-              <Pressable onPress={() => setShowDepartmentPicker(false)}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Department</Text>
+              <Pressable onPress={() => setShowDepartmentModal(false)}>
                 <IconSymbol name="xmark" color={colors.text} size={24} />
               </Pressable>
             </View>
             <FlatList
-              data={departmentList}
+              data={departments}
+              renderItem={renderDepartmentItem}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.departmentItem,
-                    { backgroundColor: colors.card },
-                    selectedDepartment?.id === item.id && { backgroundColor: colors.primary }
-                  ]}
-                  onPress={() => {
-                    setSelectedDepartment(item);
-                    setShowDepartmentPicker(false);
-                  }}
-                >
-                  <View style={[styles.departmentIcon, { backgroundColor: colors.secondary }]}>
-                    <IconSymbol 
-                      name="building.2" 
-                      color="white" 
-                      size={20} 
-                    />
-                  </View>
-                  <View style={styles.departmentInfo}>
-                    <Text
-                      style={[
-                        styles.departmentName,
-                        { color: selectedDepartment?.id === item.id ? 'white' : colors.text }
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    {item.description && (
-                      <Text
-                        style={[
-                          styles.departmentDescription,
-                          { color: selectedDepartment?.id === item.id ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
-                        ]}
-                      >
-                        {item.description}
-                      </Text>
-                    )}
-                  </View>
-                  {selectedDepartment?.id === item.id && (
-                    <IconSymbol name="checkmark" color="white" size={20} />
-                  )}
-                </Pressable>
-              )}
-              contentContainerStyle={styles.departmentList}
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
             />
-          </View>
+          </BlurView>
         </Modal>
 
-        {/* Work Type Picker Modal */}
-        <Modal visible={showWorkTypePicker} animationType="slide" presentationStyle="pageSheet">
-          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Work Type Modal */}
+        <Modal visible={showWorkTypeModal} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Type of Work</Text>
-              <Pressable onPress={() => setShowWorkTypePicker(false)}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Work Type</Text>
+              <Pressable onPress={() => setShowWorkTypeModal(false)}>
                 <IconSymbol name="xmark" color={colors.text} size={24} />
               </Pressable>
             </View>
             <FlatList
               data={WORK_TYPES}
+              renderItem={renderWorkTypeItem}
               keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.workTypeItem,
-                    { backgroundColor: colors.card },
-                    workType === item && { backgroundColor: colors.primary }
-                  ]}
-                  onPress={() => {
-                    setWorkType(item);
-                    setShowWorkTypePicker(false);
-                  }}
-                >
-                  <View style={[styles.workTypeIcon, { backgroundColor: colors.secondary }]}>
-                    <IconSymbol 
-                      name={item === 'Regular class' ? 'book' : item === 'Shimsa' ? 'checkmark.circle' : 'calendar'} 
-                      color="white" 
-                      size={20} 
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.workTypeName,
-                      { color: workType === item ? 'white' : colors.text }
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                  {workType === item && (
-                    <IconSymbol name="checkmark" color="white" size={20} />
-                  )}
-                </Pressable>
-              )}
-              contentContainerStyle={styles.workTypeList}
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
             />
-          </View>
+          </BlurView>
         </Modal>
-      </View>
+      </LinearGradient>
     </>
   );
 }
@@ -400,162 +462,148 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    flexGrow: 1,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8,
+    padding: spacing.sm,
+    marginLeft: -spacing.sm,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
+  },
+  headerIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.lg,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    maxWidth: 280,
   },
   form: {
-    flex: 1,
-    justifyContent: 'center',
+    gap: spacing.lg,
   },
   inputGroup: {
-    marginBottom: 20,
+    gap: spacing.sm,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    color: colors.text,
   },
-  input: {
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    minHeight: 48,
+  selector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: spacing.md,
+    minHeight: 56,
   },
-  inputText: {
-    fontSize: 16,
+  selectedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     flex: 1,
   },
-  helperText: {
-    fontSize: 12,
-    marginTop: 4,
+  staffAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  departmentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  workTypeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hoursInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  hoursIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hoursInput: {
+    flex: 1,
+    color: colors.text,
+    textAlign: 'center',
   },
   submitButton: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginTop: spacing.lg,
+    ...shadows.md,
+  },
+  submitGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
-    minHeight: 48,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.sm,
+    minHeight: 56,
   },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  
+  // Modal Styles
   modalContainer: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: colors.border,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  modalContent: {
+    padding: spacing.md,
+    gap: spacing.sm,
   },
-  staffList: {
-    padding: 16,
-  },
-  staffItem: {
+  modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  staffAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  staffAvatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  staffInfo: {
-    flex: 1,
-  },
-  staffName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  staffEmail: {
-    fontSize: 14,
-  },
-  departmentList: {
-    padding: 16,
-  },
-  departmentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  departmentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
   departmentInfo: {
     flex: 1,
   },
-  departmentName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  departmentDescription: {
-    fontSize: 14,
-  },
-  workTypeList: {
-    padding: 16,
-  },
   workTypeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  workTypeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  workTypeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
 });
