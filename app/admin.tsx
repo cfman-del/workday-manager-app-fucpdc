@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const [workEntries, setWorkEntries] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [staffWorkHours, setStaffWorkHours] = useState<{[key: string]: number}>({});
+  const [staffWorkHours, setStaffWorkHours] = useState<{[key: string]: {name: string, hours: number, id: string}}>({});
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
   // Generate months for picker
@@ -63,10 +63,10 @@ export default function AdminDashboard() {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    if (isLoggedIn && workEntries.length > 0) {
+    if (isLoggedIn) {
       calculateStaffWorkHours(workEntries, selectedMonth, selectedYear);
     }
-  }, [selectedMonth, selectedYear, workEntries, isLoggedIn]);
+  }, [selectedMonth, selectedYear, workEntries, isLoggedIn, staffList]);
 
   const fetchData = async () => {
     try {
@@ -105,19 +105,37 @@ export default function AdminDashboard() {
       return;
     }
 
-    const staffHours: {[key: string]: number} = {};
+    // Initialize all staff with 0 hours
+    const staffHours: {[key: string]: {name: string, hours: number, id: string}} = {};
     
+    // First, add all staff members with 0 hours
+    staffList.forEach(staff => {
+      const key = staff.id;
+      staffHours[key] = {
+        name: staff.name || 'Unknown Staff',
+        hours: 0,
+        id: staff.id
+      };
+    });
+    
+    // Then, add actual work hours from entries
     entries.forEach(entry => {
       const entryDate = new Date(entry.date);
       if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
         const staffId = entry.staff_id;
-        const staffName = entry.staff?.name || 'Unknown Staff';
-        const key = `${staffId}-${staffName}`;
+        const staffName = entry.staff?.name || staffList.find(s => s.id === staffId)?.name || 'Unknown Staff';
         
-        if (!staffHours[key]) {
-          staffHours[key] = 0;
+        if (staffHours[staffId]) {
+          staffHours[staffId].hours += parseFloat(entry.hours) || 0;
+          staffHours[staffId].name = staffName; // Ensure we have the correct name
+        } else {
+          // If staff not in list, add them
+          staffHours[staffId] = {
+            name: staffName,
+            hours: parseFloat(entry.hours) || 0,
+            id: staffId
+          };
         }
-        staffHours[key] += parseFloat(entry.hours) || 0;
       }
     });
     
@@ -583,7 +601,7 @@ export default function AdminDashboard() {
 
   const renderOverviewContent = () => {
     const currentYear = new Date().getFullYear();
-    const totalHours = Object.values(staffWorkHours).reduce((sum, hours) => sum + hours, 0);
+    const totalHours = Object.values(staffWorkHours).reduce((sum, staff) => sum + staff.hours, 0);
     const staffCount = Object.keys(staffWorkHours).length;
     const avgHours = staffCount > 0 ? (totalHours / staffCount).toFixed(1) : 0;
 
@@ -666,7 +684,7 @@ export default function AdminDashboard() {
             <View style={[styles.emptyState, commonStyles.cardElevated]}>
               <IconSymbol name="clock" color={colors.textSecondary} size={48} />
               <Text style={[commonStyles.bodyMedium, styles.emptyStateText]}>
-                No work entries found for {months[selectedMonth]} {selectedYear}
+                No staff data found for {months[selectedMonth]} {selectedYear}
               </Text>
               {selectedYear !== currentYear && (
                 <Text style={[commonStyles.caption, styles.emptyStateSubtext]}>
@@ -677,48 +695,48 @@ export default function AdminDashboard() {
           ) : (
             <View style={styles.staffHoursList}>
               {Object.entries(staffWorkHours)
-                .sort(([, hoursA], [, hoursB]) => hoursB - hoursA)
-                .map(([staffKey, hours], index) => {
-                  const [staffId, staffName] = staffKey.split('-');
-                  return (
-                    <Animated.View 
-                      key={staffKey} 
-                      entering={FadeInDown.delay(index * 50).springify()}
-                    >
-                      <View style={[styles.staffHourCard, commonStyles.cardElevated]}>
-                        <View style={styles.staffHourHeader}>
-                          <LinearGradient
-                            colors={[colors.primary, colors.secondary]}
-                            style={styles.staffHourAvatar}
-                          >
-                            <Text style={styles.staffAvatarText}>
-                              {staffName.charAt(0).toUpperCase()}
-                            </Text>
-                          </LinearGradient>
-                          <View style={styles.staffHourInfo}>
-                            <Text style={[commonStyles.bodyMedium, styles.staffHourName]}>
-                              {staffName}
-                            </Text>
-                            <Text style={[commonStyles.caption, { color: colors.primary }]}>
-                              {hours.toFixed(1)} hours
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.staffHourProgress}>
-                          <LinearGradient
-                            colors={[colors.primary, colors.secondary]}
-                            style={[
-                              styles.staffHourProgressBar,
-                              { 
-                                width: `${Math.min((hours / Math.max(...Object.values(staffWorkHours))) * 100, 100)}%`
-                              }
-                            ]}
-                          />
+                .sort(([, staffA], [, staffB]) => staffB.hours - staffA.hours)
+                .map(([staffId, staffData], index) => (
+                  <Animated.View 
+                    key={staffId} 
+                    entering={FadeInDown.delay(index * 50).springify()}
+                  >
+                    <View style={[styles.staffHourCard, commonStyles.cardElevated]}>
+                      <View style={styles.staffHourHeader}>
+                        <LinearGradient
+                          colors={[colors.primary, colors.secondary]}
+                          style={styles.staffHourAvatar}
+                        >
+                          <Text style={styles.staffAvatarText}>
+                            {staffData.name.charAt(0).toUpperCase()}
+                          </Text>
+                        </LinearGradient>
+                        <View style={styles.staffHourInfo}>
+                          <Text style={[commonStyles.bodyMedium, styles.staffHourName]}>
+                            {staffData.name}
+                          </Text>
+                          <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>
+                            ID: {staffData.id.substring(0, 8)}...
+                          </Text>
+                          <Text style={[commonStyles.caption, { color: colors.primary }]}>
+                            {staffData.hours.toFixed(1)} hours
+                          </Text>
                         </View>
                       </View>
-                    </Animated.View>
-                  );
-                })}
+                      <View style={styles.staffHourProgress}>
+                        <LinearGradient
+                          colors={[colors.primary, colors.secondary]}
+                          style={[
+                            styles.staffHourProgressBar,
+                            { 
+                              width: `${Math.min((staffData.hours / Math.max(...Object.values(staffWorkHours).map(s => s.hours))) * 100, 100)}%`
+                            }
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </Animated.View>
+                ))}
             </View>
           )}
         </Animated.View>
@@ -751,7 +769,7 @@ export default function AdminDashboard() {
                         </View>
                       </View>
                       <Text style={[commonStyles.caption, styles.entryProject]}>
-                        {entry.staff?.name || 'Unknown Staff'}
+                        {entry.staff?.name || 'Unknown Staff'} (ID: {entry.staff_id?.substring(0, 8) || 'N/A'}...)
                       </Text>
                       <Text style={[commonStyles.body, styles.entryDescription]}>
                         {entry.description || 'No description'}
@@ -1079,7 +1097,7 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Description</Text>
+            <Text style={[commonStyles.caption, { color: colors.text }]}>Description</Text>
             <TextInput
               style={[commonStyles.input, styles.textArea]}
               value={editDepartmentDescription}
