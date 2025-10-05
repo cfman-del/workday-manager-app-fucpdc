@@ -2,16 +2,20 @@
 import { supabase } from "@/app/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/app/integrations/supabase/types";
 import { Stack, router } from "expo-router";
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal, Platform } from "react-native";
 import { IconSymbol } from "@/components/IconSymbol";
 import { colors, spacing, borderRadius, shadows, typography, commonStyles } from "@/styles/commonStyles";
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState, useEffect } from "react";
 
 type Staff = Tables<"staff">;
 type Department = Tables<"departments">;
+type WorkEntry = Tables<"work_entries">;
+
+const WORK_TYPES = ["Regular class", "Shimsa", "Event"];
 
 export default function AdminDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -27,6 +31,8 @@ export default function AdminDashboard() {
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showEditDepartmentModal, setShowEditDepartmentModal] = useState(false);
+  const [showAddWorkEntryModal, setShowAddWorkEntryModal] = useState(false);
+  const [showEditWorkEntryModal, setShowEditWorkEntryModal] = useState(false);
   
   // Form states
   const [newStaffName, setNewStaffName] = useState("");
@@ -42,6 +48,28 @@ export default function AdminDashboard() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [editDepartmentName, setEditDepartmentName] = useState("");
   const [editDepartmentDescription, setEditDepartmentDescription] = useState("");
+
+  // Work entry form states
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
+  const [selectedWorkType, setSelectedWorkType] = useState("");
+  const [workDate, setWorkDate] = useState(new Date());
+  const [workHours, setWorkHours] = useState("");
+  const [workDescription, setWorkDescription] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStaffPicker, setShowStaffPicker] = useState(false);
+  const [showDepartmentPicker, setShowDepartmentPicker] = useState(false);
+  const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
+
+  // Edit work entry states
+  const [editingWorkEntry, setEditingWorkEntry] = useState<WorkEntry | null>(null);
+  const [editStaffId, setEditStaffId] = useState("");
+  const [editDepartmentId, setEditDepartmentId] = useState("");
+  const [editWorkType, setEditWorkType] = useState("");
+  const [editWorkDate, setEditWorkDate] = useState(new Date());
+  const [editWorkHours, setEditWorkHours] = useState("");
+  const [editWorkDescription, setEditWorkDescription] = useState("");
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
 
   // Work overview state
   const [workEntries, setWorkEntries] = useState<any[]>([]);
@@ -79,6 +107,10 @@ export default function AdminDashboard() {
             id,
             name,
             email
+          ),
+          departments:department_id (
+            id,
+            name
           )
         `)
       ]);
@@ -93,6 +125,7 @@ export default function AdminDashboard() {
       
       calculateStaffWorkHours(workEntriesResponse.data || [], selectedMonth, selectedYear);
     } catch (error: any) {
+      console.error("Error fetching data:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -155,6 +188,10 @@ export default function AdminDashboard() {
             id,
             name,
             email
+          ),
+          departments:department_id (
+            id,
+            name
           )
         `)
         .gte('date', startDate)
@@ -165,6 +202,7 @@ export default function AdminDashboard() {
       setWorkEntries(data || []);
       calculateStaffWorkHours(data || [], month, year);
     } catch (error: any) {
+      console.error("Error fetching work entries:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -186,6 +224,191 @@ export default function AdminDashboard() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  // Work Entry Management Functions
+  const addWorkEntry = async () => {
+    if (!selectedStaffId || !selectedDepartmentId || !selectedWorkType || !workHours) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    const hours = parseFloat(workHours);
+    if (isNaN(hours) || hours <= 0) {
+      Alert.alert("Error", "Please enter valid work hours");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("work_entries")
+        .insert([
+          {
+            staff_id: selectedStaffId,
+            department_id: selectedDepartmentId,
+            work_type: selectedWorkType,
+            date: workDate.toISOString().split('T')[0],
+            hours: hours,
+            description: workDescription || null,
+          },
+        ])
+        .select(`
+          *,
+          staff:staff_id (
+            id,
+            name,
+            email
+          ),
+          departments:department_id (
+            id,
+            name
+          )
+        `);
+
+      if (error) throw error;
+
+      setWorkEntries((prev) => [...prev, ...(data || [])]);
+      setShowAddWorkEntryModal(false);
+      resetWorkEntryForm();
+      Alert.alert("Success", "Work entry added successfully!");
+      
+      // Refresh data to update calculations
+      fetchData();
+    } catch (error: any) {
+      console.error("Error adding work entry:", error);
+      Alert.alert("Error", error.message);
+    }
+  };
+
+  const editWorkEntry = async () => {
+    if (!editingWorkEntry || !editStaffId || !editDepartmentId || !editWorkType || !editWorkHours) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    const hours = parseFloat(editWorkHours);
+    if (isNaN(hours) || hours <= 0) {
+      Alert.alert("Error", "Please enter valid work hours");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("work_entries")
+        .update({
+          staff_id: editStaffId,
+          department_id: editDepartmentId,
+          work_type: editWorkType,
+          date: editWorkDate.toISOString().split('T')[0],
+          hours: hours,
+          description: editWorkDescription || null,
+        })
+        .eq("id", editingWorkEntry.id)
+        .select(`
+          *,
+          staff:staff_id (
+            id,
+            name,
+            email
+          ),
+          departments:department_id (
+            id,
+            name
+          )
+        `);
+
+      if (error) throw error;
+
+      setWorkEntries((prev) =>
+        prev.map((entry) =>
+          entry.id === editingWorkEntry.id ? (data?.[0] || entry) : entry
+        )
+      );
+      setShowEditWorkEntryModal(false);
+      setEditingWorkEntry(null);
+      Alert.alert("Success", "Work entry updated successfully!");
+      
+      // Refresh data to update calculations
+      fetchData();
+    } catch (error: any) {
+      console.error("Error updating work entry:", error);
+      Alert.alert("Error", error.message);
+    }
+  };
+
+  const deleteWorkEntry = async (entryId: string, staffName: string, date: string) => {
+    Alert.alert(
+      "Delete Work Entry",
+      `Are you sure you want to delete the work entry for ${staffName} on ${new Date(date).toLocaleDateString()}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("work_entries")
+                .delete()
+                .eq("id", entryId);
+
+              if (error) throw error;
+
+              setWorkEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+              Alert.alert("Success", "Work entry deleted successfully!");
+              
+              // Refresh data to update calculations
+              fetchData();
+            } catch (error: any) {
+              console.error("Error deleting work entry:", error);
+              Alert.alert("Error", error.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openEditWorkEntryModal = (workEntry: any) => {
+    setEditingWorkEntry(workEntry);
+    setEditStaffId(workEntry.staff_id);
+    setEditDepartmentId(workEntry.department_id);
+    setEditWorkType(workEntry.work_type);
+    setEditWorkDate(new Date(workEntry.date));
+    setEditWorkHours(workEntry.hours.toString());
+    setEditWorkDescription(workEntry.description || "");
+    setShowEditWorkEntryModal(true);
+  };
+
+  const resetWorkEntryForm = () => {
+    setSelectedStaffId("");
+    setSelectedDepartmentId("");
+    setSelectedWorkType("");
+    setWorkDate(new Date());
+    setWorkHours("");
+    setWorkDescription("");
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setWorkDate(selectedDate);
+    }
+  };
+
+  const handleEditDateChange = (event: any, selectedDate?: Date) => {
+    setShowEditDatePicker(false);
+    if (selectedDate) {
+      setEditWorkDate(selectedDate);
+    }
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
   const addStaff = async () => {
@@ -213,6 +436,7 @@ export default function AdminDashboard() {
       setNewStaffStatus("active");
       Alert.alert("Success", "Staff member added successfully!");
     } catch (error: any) {
+      console.error("Error adding staff:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -322,6 +546,7 @@ export default function AdminDashboard() {
       setEditingStaff(null);
       Alert.alert("Success", "Staff member updated successfully!");
     } catch (error: any) {
+      console.error("Error editing staff:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -353,6 +578,7 @@ export default function AdminDashboard() {
               setStaffList((prev) => prev.filter((staff) => staff.id !== staffId));
               Alert.alert("Success", "Staff member removed successfully!");
             } catch (error: any) {
+              console.error("Error removing staff:", error);
               Alert.alert("Error", error.message);
             }
           },
@@ -386,6 +612,7 @@ export default function AdminDashboard() {
       setNewDepartmentDescription("");
       Alert.alert("Success", "Department added successfully!");
     } catch (error: any) {
+      console.error("Error adding department:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -417,6 +644,7 @@ export default function AdminDashboard() {
       setEditingDepartment(null);
       Alert.alert("Success", "Department updated successfully!");
     } catch (error: any) {
+      console.error("Error editing department:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -448,6 +676,7 @@ export default function AdminDashboard() {
               setDepartments((prev) => prev.filter((dept) => dept.id !== departmentId));
               Alert.alert("Success", "Department removed successfully!");
             } catch (error: any) {
+              console.error("Error removing department:", error);
               Alert.alert("Error", error.message);
             }
           },
@@ -537,6 +766,59 @@ export default function AdminDashboard() {
               <IconSymbol name="trash" color="white" size={16} />
             </Pressable>
           </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
+  const renderWorkEntryCard = ({ item, index }: { item: any; index: number }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+    >
+      <View style={[commonStyles.cardElevated, styles.workEntryCard]}>
+        <View style={styles.workEntryHeader}>
+          <View style={styles.workEntryInfo}>
+            <Text style={[commonStyles.bodyMedium, styles.workEntryDate]}>
+              {new Date(item.date).toLocaleDateString()}
+            </Text>
+            <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>
+              {item.staff?.name || 'Unknown Staff'} (ID: {item.staff_id?.substring(0, 8)}...)
+            </Text>
+            <Text style={[commonStyles.caption, { color: colors.textSecondary }]}>
+              {item.departments?.name || 'Unknown Department'}
+            </Text>
+          </View>
+          <View style={styles.workEntryDetails}>
+            <View style={[styles.hoursBadge, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[commonStyles.captionMedium, { color: colors.primary }]}>
+                {item.hours}h
+              </Text>
+            </View>
+            <View style={[styles.workTypeBadge, { backgroundColor: colors.secondary + '20' }]}>
+              <Text style={[commonStyles.caption, { color: colors.secondary }]}>
+                {item.work_type}
+              </Text>
+            </View>
+          </View>
+        </View>
+        {item.description && (
+          <Text style={[commonStyles.body, styles.workEntryDescription]}>
+            {item.description}
+          </Text>
+        )}
+        <View style={styles.workEntryActions}>
+          <Pressable
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={() => openEditWorkEntryModal(item)}
+          >
+            <IconSymbol name="pencil" color="white" size={16} />
+          </Pressable>
+          <Pressable
+            style={[styles.actionButton, { backgroundColor: colors.error }]}
+            onPress={() => deleteWorkEntry(item.id, item.staff?.name || 'Unknown Staff', item.date)}
+          >
+            <IconSymbol name="trash" color="white" size={16} />
+          </Pressable>
         </View>
       </View>
     </Animated.View>
@@ -741,45 +1023,39 @@ export default function AdminDashboard() {
           )}
         </Animated.View>
 
-        {/* Recent Entries */}
-        {workEntries.length > 0 && (
-          <Animated.View 
-            style={styles.entriesSection}
-            entering={FadeInDown.delay(400).springify()}
-          >
-            <Text style={[commonStyles.heading4, styles.sectionTitle]}>Recent Entries</Text>
+        {/* Work Entries Management */}
+        <Animated.View 
+          style={styles.entriesSection}
+          entering={FadeInDown.delay(400).springify()}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={[commonStyles.heading4, styles.sectionTitle]}>Work Entries</Text>
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAddWorkEntryModal(true)}
+            >
+              <IconSymbol name="plus" color="white" size={20} />
+            </Pressable>
+          </View>
+          {workEntries.length > 0 ? (
             <View style={styles.entriesList}>
               {workEntries
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 5)
                 .map((entry, index) => (
-                  <Animated.View 
-                    key={index}
-                    entering={FadeInDown.delay(index * 50).springify()}
-                  >
-                    <View style={[styles.entryCard, commonStyles.cardElevated]}>
-                      <View style={styles.entryHeader}>
-                        <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
-                          {new Date(entry.date).toLocaleDateString()}
-                        </Text>
-                        <View style={[styles.hoursBadge, { backgroundColor: colors.primary + '20' }]}>
-                          <Text style={[commonStyles.captionMedium, { color: colors.primary }]}>
-                            {entry.hours}h
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={[commonStyles.caption, styles.entryProject]}>
-                        {entry.staff?.name || 'Unknown Staff'} (ID: {entry.staff_id?.substring(0, 8) || 'N/A'}...)
-                      </Text>
-                      <Text style={[commonStyles.body, styles.entryDescription]}>
-                        {entry.description || 'No description'}
-                      </Text>
-                    </View>
-                  </Animated.View>
+                  <View key={entry.id}>
+                    {renderWorkEntryCard({ item: entry, index })}
+                  </View>
                 ))}
             </View>
-          </Animated.View>
-        )}
+          ) : (
+            <View style={[styles.emptyState, commonStyles.cardElevated]}>
+              <IconSymbol name="calendar" color={colors.textSecondary} size={48} />
+              <Text style={[commonStyles.bodyMedium, styles.emptyStateText]}>
+                No work entries found for {months[selectedMonth]} {selectedYear}
+              </Text>
+            </View>
+          )}
+        </Animated.View>
 
         {/* Month Picker Modal */}
         <Modal visible={showMonthPicker} animationType="slide" presentationStyle="pageSheet">
@@ -887,6 +1163,374 @@ export default function AdminDashboard() {
         />
       </Animated.View>
     </ScrollView>
+  );
+
+  const renderStaffItem = ({ item, index }: { item: Staff; index: number }) => (
+    <Pressable
+      style={[
+        styles.pickerItem,
+        commonStyles.cardElevated,
+        selectedStaffId === item.id && { backgroundColor: colors.primary }
+      ]}
+      onPress={() => {
+        setSelectedStaffId(item.id);
+        setShowStaffPicker(false);
+      }}
+    >
+      <Text
+        style={[
+          commonStyles.bodyMedium,
+          { color: colors.text },
+          selectedStaffId === item.id && { color: 'white' }
+        ]}
+      >
+        {item.name}
+      </Text>
+    </Pressable>
+  );
+
+  const renderDepartmentItem = ({ item, index }: { item: Department; index: number }) => (
+    <Pressable
+      style={[
+        styles.pickerItem,
+        commonStyles.cardElevated,
+        selectedDepartmentId === item.id && { backgroundColor: colors.primary }
+      ]}
+      onPress={() => {
+        setSelectedDepartmentId(item.id);
+        setShowDepartmentPicker(false);
+      }}
+    >
+      <Text
+        style={[
+          commonStyles.bodyMedium,
+          { color: colors.text },
+          selectedDepartmentId === item.id && { color: 'white' }
+        ]}
+      >
+        {item.name}
+      </Text>
+    </Pressable>
+  );
+
+  const renderWorkTypeItem = ({ item, index }: { item: string; index: number }) => (
+    <Pressable
+      style={[
+        styles.pickerItem,
+        commonStyles.cardElevated,
+        selectedWorkType === item && { backgroundColor: colors.primary }
+      ]}
+      onPress={() => {
+        setSelectedWorkType(item);
+        setShowWorkTypePicker(false);
+      }}
+    >
+      <Text
+        style={[
+          commonStyles.bodyMedium,
+          { color: colors.text },
+          selectedWorkType === item && { color: 'white' }
+        ]}
+      >
+        {item}
+      </Text>
+    </Pressable>
+  );
+
+  const renderAddWorkEntryModal = () => (
+    <Modal visible={showAddWorkEntryModal} animationType="slide" presentationStyle="pageSheet">
+      <BlurView intensity={100} style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Add Work Entry</Text>
+          <Pressable onPress={() => {
+            setShowAddWorkEntryModal(false);
+            resetWorkEntryForm();
+          }}>
+            <IconSymbol name="xmark" color={colors.text} size={24} />
+          </Pressable>
+        </View>
+        <ScrollView style={styles.modalContent}>
+          {/* Staff Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Staff Member *</Text>
+            <Pressable
+              style={[commonStyles.input, styles.pickerButton]}
+              onPress={() => setShowStaffPicker(true)}
+            >
+              <Text style={[commonStyles.bodyMedium, { 
+                color: selectedStaffId ? colors.text : colors.textSecondary 
+              }]}>
+                {selectedStaffId ? staffList.find(s => s.id === selectedStaffId)?.name : 'Select staff member'}
+              </Text>
+              <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+            </Pressable>
+          </View>
+
+          {/* Department Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Department *</Text>
+            <Pressable
+              style={[commonStyles.input, styles.pickerButton]}
+              onPress={() => setShowDepartmentPicker(true)}
+            >
+              <Text style={[commonStyles.bodyMedium, { 
+                color: selectedDepartmentId ? colors.text : colors.textSecondary 
+              }]}>
+                {selectedDepartmentId ? departments.find(d => d.id === selectedDepartmentId)?.name : 'Select department'}
+              </Text>
+              <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+            </Pressable>
+          </View>
+
+          {/* Work Type Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Type of Work *</Text>
+            <Pressable
+              style={[commonStyles.input, styles.pickerButton]}
+              onPress={() => setShowWorkTypePicker(true)}
+            >
+              <Text style={[commonStyles.bodyMedium, { 
+                color: selectedWorkType ? colors.text : colors.textSecondary 
+              }]}>
+                {selectedWorkType || 'Select work type'}
+              </Text>
+              <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+            </Pressable>
+          </View>
+
+          {/* Date Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Date *</Text>
+            <Pressable
+              style={[commonStyles.input, styles.pickerButton]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                {formatDate(workDate)}
+              </Text>
+              <IconSymbol name="calendar" color={colors.textSecondary} size={20} />
+            </Pressable>
+          </View>
+
+          {/* Hours Input */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Hours *</Text>
+            <TextInput
+              style={[commonStyles.input, styles.input]}
+              value={workHours}
+              onChangeText={setWorkHours}
+              placeholder="Enter work hours"
+              keyboardType="numeric"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          {/* Description Input */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Description</Text>
+            <TextInput
+              style={[commonStyles.input, styles.textArea]}
+              value={workDescription}
+              onChangeText={setWorkDescription}
+              placeholder="Enter work description (optional)"
+              multiline
+              numberOfLines={4}
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={addWorkEntry}
+          >
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Add Work Entry</Text>
+          </Pressable>
+        </ScrollView>
+
+        {/* Date Picker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={workDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+          />
+        )}
+
+        {/* Staff Picker Modal */}
+        <Modal visible={showStaffPicker} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Staff</Text>
+              <Pressable onPress={() => setShowStaffPicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={staffList.filter(s => s.status === 'active')}
+              renderItem={renderStaffItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.pickerList}
+            />
+          </BlurView>
+        </Modal>
+
+        {/* Department Picker Modal */}
+        <Modal visible={showDepartmentPicker} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Department</Text>
+              <Pressable onPress={() => setShowDepartmentPicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={departments}
+              renderItem={renderDepartmentItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.pickerList}
+            />
+          </BlurView>
+        </Modal>
+
+        {/* Work Type Picker Modal */}
+        <Modal visible={showWorkTypePicker} animationType="slide" presentationStyle="pageSheet">
+          <BlurView intensity={100} style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Work Type</Text>
+              <Pressable onPress={() => setShowWorkTypePicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={WORK_TYPES}
+              renderItem={renderWorkTypeItem}
+              keyExtractor={(item) => item}
+              contentContainerStyle={styles.pickerList}
+            />
+          </BlurView>
+        </Modal>
+      </BlurView>
+    </Modal>
+  );
+
+  const renderEditWorkEntryModal = () => (
+    <Modal visible={showEditWorkEntryModal} animationType="slide" presentationStyle="pageSheet">
+      <BlurView intensity={100} style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={[commonStyles.heading3, { color: colors.text }]}>Edit Work Entry</Text>
+          <Pressable onPress={() => {
+            setShowEditWorkEntryModal(false);
+            setEditingWorkEntry(null);
+          }}>
+            <IconSymbol name="xmark" color={colors.text} size={24} />
+          </Pressable>
+        </View>
+        <ScrollView style={styles.modalContent}>
+          {/* Staff Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Staff Member *</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.textSecondary }]}>
+              {staffList.find(s => s.id === editStaffId)?.name || 'Unknown Staff'}
+            </Text>
+          </View>
+
+          {/* Department Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Department *</Text>
+            <Text style={[commonStyles.bodyMedium, { color: colors.textSecondary }]}>
+              {departments.find(d => d.id === editDepartmentId)?.name || 'Unknown Department'}
+            </Text>
+          </View>
+
+          {/* Work Type Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Type of Work *</Text>
+            <View style={styles.workTypeContainer}>
+              {WORK_TYPES.map((type) => (
+                <Pressable
+                  key={type}
+                  style={[
+                    styles.workTypeOption,
+                    commonStyles.cardElevated,
+                    editWorkType === type && { backgroundColor: colors.primary }
+                  ]}
+                  onPress={() => setEditWorkType(type)}
+                >
+                  <Text
+                    style={[
+                      commonStyles.bodyMedium,
+                      { color: colors.text },
+                      editWorkType === type && { color: 'white' }
+                    ]}
+                  >
+                    {type}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Date Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Date *</Text>
+            <Pressable
+              style={[commonStyles.input, styles.pickerButton]}
+              onPress={() => setShowEditDatePicker(true)}
+            >
+              <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                {formatDate(editWorkDate)}
+              </Text>
+              <IconSymbol name="calendar" color={colors.textSecondary} size={20} />
+            </Pressable>
+          </View>
+
+          {/* Hours Input */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Hours *</Text>
+            <TextInput
+              style={[commonStyles.input, styles.input]}
+              value={editWorkHours}
+              onChangeText={setEditWorkHours}
+              placeholder="Enter work hours"
+              keyboardType="numeric"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          {/* Description Input */}
+          <View style={styles.inputGroup}>
+            <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>Description</Text>
+            <TextInput
+              style={[commonStyles.input, styles.textArea]}
+              value={editWorkDescription}
+              onChangeText={setEditWorkDescription}
+              placeholder="Enter work description (optional)"
+              multiline
+              numberOfLines={4}
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={editWorkEntry}
+          >
+            <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>Update Work Entry</Text>
+          </Pressable>
+        </ScrollView>
+
+        {/* Edit Date Picker */}
+        {showEditDatePicker && (
+          <DateTimePicker
+            value={editWorkDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleEditDateChange}
+          />
+        )}
+      </BlurView>
+    </Modal>
   );
 
   const renderAddStaffModal = () => (
@@ -1299,6 +1943,8 @@ export default function AdminDashboard() {
         {renderEditStaffModal()}
         {renderAddDepartmentModal()}
         {renderEditDepartmentModal()}
+        {renderAddWorkEntryModal()}
+        {renderEditWorkEntryModal()}
       </LinearGradient>
     </>
   );
@@ -1471,6 +2117,10 @@ const styles = StyleSheet.create({
   departmentCard: {
     marginBottom: spacing.md,
   },
+  workEntryCard: {
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1544,6 +2194,43 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   
+  // Work Entry Card Styles
+  workEntryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  workEntryInfo: {
+    flex: 1,
+  },
+  workEntryDate: {
+    marginBottom: spacing.xs,
+  },
+  workEntryDetails: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  hoursBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  workTypeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  workEntryDescription: {
+    marginBottom: spacing.md,
+    lineHeight: 22,
+  },
+  workEntryActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  
   // Modal Styles
   modalContainer: {
     flex: 1,
@@ -1575,6 +2262,30 @@ const styles = StyleSheet.create({
   },
   statusOption: {
     flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  workTypeContainer: {
+    gap: spacing.sm,
+  },
+  workTypeOption: {
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  
+  // Picker Styles
+  pickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pickerList: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  pickerItem: {
     padding: spacing.md,
     borderRadius: borderRadius.md,
     alignItems: 'center',
@@ -1737,11 +2448,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
-  },
-  hoursBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
   },
   entryProject: {
     marginBottom: spacing.xs,
