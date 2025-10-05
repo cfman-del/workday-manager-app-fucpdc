@@ -63,10 +63,7 @@ export default function HomeScreen() {
       )}
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
-          contentContainerStyle={[
-            styles.scrollContainer,
-            Platform.OS !== 'ios' && styles.scrollContainerWithTabBar
-          ]}
+          contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
@@ -93,9 +90,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 16,
   },
-  scrollContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
-  },
+
   header: {
     alignItems: 'center',
     marginBottom: 32,
