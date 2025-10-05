@@ -15,17 +15,9 @@ type Staff = Tables<"staff">;
 type Department = Tables<"departments">;
 
 const WORK_TYPES = [
-  "Development",
-  "Design",
-  "Testing",
-  "Documentation",
-  "Meeting",
-  "Research",
-  "Planning",
-  "Review",
-  "Training",
-  "Support",
-  "Other"
+  "Regular class",
+  "Shimsa",
+  "Event"
 ];
 
 export default function RegisterWorkDay() {
