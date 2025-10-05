@@ -1,3 +1,4 @@
+
 import "react-native-reanimated";
 import React, { useEffect } from "react";
 import { useFonts } from "expo-font";
@@ -21,7 +22,7 @@ import { WidgetProvider } from "@/contexts/WidgetContext";
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+  initialRouteName: "index",
 };
 
 export default function RootLayout() {
@@ -86,7 +87,15 @@ export default function RootLayout() {
           <WidgetProvider>
             <GestureHandlerRootView>
             <Stack>
-              {/* Main app with tabs */}
+              {/* Main home screen */}
+              <Stack.Screen name="index" options={{ headerShown: true }} />
+              
+              {/* App screens */}
+              <Stack.Screen name="register" options={{ headerShown: true }} />
+              <Stack.Screen name="admin" options={{ headerShown: true }} />
+              <Stack.Screen name="overview" options={{ headerShown: true }} />
+
+              {/* Keep the old tab structure for backward compatibility */}
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
               {/* Modal Demo Screens */}

@@ -17,11 +17,13 @@ export const buttonStyles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignSelf: 'center',
     width: '100%',
+    minHeight: 48, // Ensure minimum touch target
   },
   backButton: {
     backgroundColor: colors.secondary,
     alignSelf: 'center',
     width: '100%',
+    minHeight: 48, // Ensure minimum touch target
   },
 });
 
@@ -45,6 +47,7 @@ export const commonStyles = StyleSheet.create({
     justifyContent: 'center',
     maxWidth: 800,
     width: '100%',
+    paddingHorizontal: 16, // Add horizontal padding for mobile
   },
   title: {
     fontSize: 24,
@@ -81,6 +84,7 @@ export const commonStyles = StyleSheet.create({
     width: '100%',
     boxShadow: '0px 2px 3px rgba(0, 0, 0, 0.1)',
     elevation: 2,
+    minHeight: 60, // Ensure minimum touch target for mobile
   },
   icon: {
     width: 60,

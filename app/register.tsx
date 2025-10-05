@@ -1,26 +1,31 @@
 
+import { Stack, router } from "expo-router";
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert } from "react-native";
-import { Stack, router } from "expo-router";
 import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
 
 export default function RegisterWorkDay() {
-  const [workHours, setWorkHours] = useState("");
-  const [description, setDescription] = useState("");
-  const [project, setProject] = useState("");
+  const [workHours, setWorkHours] = useState('');
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleSubmit = () => {
     if (!workHours || !description) {
-      Alert.alert("Error", "Please fill in all required fields");
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    
-    console.log("Registering work day:", { workHours, description, project });
+
+    // Here you would typically save to your database
     Alert.alert(
-      "Success", 
-      "Work day registered successfully!",
-      [{ text: "OK", onPress: () => router.back() }]
+      'Success', 
+      'Work day registered successfully!',
+      [
+        {
+          text: 'OK',
+          onPress: () => router.back()
+        }
+      ]
     );
   };
 
@@ -41,52 +46,44 @@ export default function RegisterWorkDay() {
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="calendar.badge.plus" color="white" size={32} />
-            </View>
-            <Text style={[styles.title, { color: colors.text }]}>Register Work Day</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Log your daily work activities and hours
-            </Text>
-          </View>
-
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Work Hours *</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Date</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                placeholder="Enter hours worked (e.g., 8)"
+                value={date}
+                onChangeText={setDate}
+                placeholder="YYYY-MM-DD"
                 placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Work Hours</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
                 value={workHours}
                 onChangeText={setWorkHours}
+                placeholder="8"
                 keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Project</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                placeholder="Project name (optional)"
                 placeholderTextColor={colors.textSecondary}
-                value={project}
-                onChangeText={setProject}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Description</Text>
               <TextInput
                 style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
-                placeholder="Describe your work activities..."
-                placeholderTextColor={colors.textSecondary}
                 value={description}
                 onChangeText={setDescription}
+                placeholder="Describe your work activities..."
                 multiline
                 numberOfLines={4}
-                textAlignVertical="top"
+                placeholderTextColor={colors.textSecondary}
               />
             </View>
 
@@ -108,64 +105,49 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    padding: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    flexGrow: 1,
   },
   backButton: {
     padding: 8,
     marginLeft: -8,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   form: {
-    gap: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
   inputGroup: {
-    gap: 8,
+    marginBottom: 20,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 8,
   },
   input: {
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: colors.secondary + '30',
+    borderColor: '#E0E0E0',
+    minHeight: 48,
   },
   textArea: {
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: colors.secondary + '30',
-    minHeight: 100,
+    borderColor: '#E0E0E0',
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
   submitButton: {
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginTop: 20,
+    minHeight: 48,
   },
   submitButtonText: {
     color: 'white',

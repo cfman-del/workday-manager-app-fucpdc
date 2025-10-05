@@ -1,65 +1,47 @@
 
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from "react-native";
-import { Stack, router } from "expo-router";
-import { IconSymbol } from "@/components/IconSymbol";
-import { colors } from "@/styles/commonStyles";
 import { supabase } from "@/app/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/app/integrations/supabase/types";
+import { Stack, router } from "expo-router";
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from "react-native";
+import { IconSymbol } from "@/components/IconSymbol";
+import { colors } from "@/styles/commonStyles";
+import React, { useState, useEffect } from "react";
 
-type Staff = Tables<'staff'> & {
-  departments?: Tables<'departments'> | null;
-};
-
-type Department = Tables<'departments'>;
+type Staff = Tables<"staff">;
+type Department = Tables<"departments">;
 
 export default function AdminDashboard() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isSecureEntry, setIsSecureEntry] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [staff, setStaff] = useState<Staff[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(false);
   
   // Modal states
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
-  const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
+  const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showEditDepartmentModal, setShowEditDepartmentModal] = useState(false);
   
-  // Edit states
-  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
-  
   // Form states
-  const [newStaff, setNewStaff] = useState({
-    name: '',
-    position: '',
-    email: '',
-    phone: '',
-    department_id: '',
-    status: 'active' as 'active' | 'inactive'
-  });
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffEmail, setNewStaffEmail] = useState("");
+  const [newStaffDepartment, setNewStaffDepartment] = useState("");
+  const [newStaffStatus, setNewStaffStatus] = useState("active");
   
-  const [newDepartment, setNewDepartment] = useState({
-    name: '',
-    description: ''
-  });
-
-  const [editStaffForm, setEditStaffForm] = useState({
-    name: '',
-    position: '',
-    email: '',
-    phone: '',
-    department_id: '',
-    status: 'active' as 'active' | 'inactive'
-  });
-
-  const [editDepartmentForm, setEditDepartmentForm] = useState({
-    name: '',
-    description: ''
-  });
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [editStaffName, setEditStaffName] = useState("");
+  const [editStaffEmail, setEditStaffEmail] = useState("");
+  const [editStaffDepartment, setEditStaffDepartment] = useState("");
+  const [editStaffStatus, setEditStaffStatus] = useState("");
+  
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [newDepartmentDescription, setNewDepartmentDescription] = useState("");
+  
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [editDepartmentName, setEditDepartmentName] = useState("");
+  const [editDepartmentDescription, setEditDepartmentDescription] = useState("");
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -68,816 +50,466 @@ export default function AdminDashboard() {
   }, [isLoggedIn]);
 
   const fetchData = async () => {
-    setLoading(true);
     try {
-      // Fetch staff with department information
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff')
-        .select(`
-          *,
-          departments (
-            id,
-            name,
-            description
-          )
-        `)
-        .order('name');
+      const [staffResponse, departmentsResponse] = await Promise.all([
+        supabase.from("staff").select("*"),
+        supabase.from("departments").select("*")
+      ]);
 
-      if (staffError) {
-        console.error('Error fetching staff:', staffError);
-        Alert.alert('Error', 'Failed to fetch staff data');
-      } else {
-        setStaff(staffData || []);
-      }
+      if (staffResponse.error) throw staffResponse.error;
+      if (departmentsResponse.error) throw departmentsResponse.error;
 
-      // Fetch departments
-      const { data: departmentsData, error: departmentsError } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name');
-
-      if (departmentsError) {
-        console.error('Error fetching departments:', departmentsError);
-        Alert.alert('Error', 'Failed to fetch departments data');
-      } else {
-        setDepartments(departmentsData || []);
-      }
-    } catch (error) {
-      console.error('Error in fetchData:', error);
-      Alert.alert('Error', 'Failed to fetch data');
-    } finally {
-      setLoading(false);
+      setStaffList(staffResponse.data || []);
+      setDepartments(departmentsResponse.data || []);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const handleLogin = () => {
-    if (!username || !password) {
-      Alert.alert("Error", "Please enter both username and password");
-      return;
-    }
-    
-    console.log("Admin login attempt:", { username });
-    
     if (username === "cfman@mudo.se" && password === "4218manMudo") {
-      console.log("Admin login successful");
       setIsLoggedIn(true);
+      Alert.alert("Success", "Welcome to the admin dashboard!");
     } else {
-      Alert.alert("Error", "Invalid credentials. Please try again.");
+      Alert.alert("Error", "Invalid credentials");
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Logout", 
-          style: "destructive",
-          onPress: () => {
-            setIsLoggedIn(false);
-            setUsername("");
-            setPassword("");
-            setStaff([]);
-            setDepartments([]);
-            console.log("Admin logged out");
-          }
-        }
-      ]
-    );
+    setIsLoggedIn(false);
+    setUsername("");
+    setPassword("");
   };
 
   const togglePasswordVisibility = () => {
-    setIsSecureEntry(!isSecureEntry);
+    setShowPassword(!showPassword);
   };
 
   const addStaff = async () => {
-    if (!newStaff.name || !newStaff.position || !newStaff.email) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!newStaffName || !newStaffEmail || !newStaffDepartment) {
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
-      const staffToInsert: TablesInsert<'staff'> = {
-        name: newStaff.name,
-        position: newStaff.position,
-        email: newStaff.email,
-        phone: newStaff.phone || null,
-        department_id: newStaff.department_id || null,
-        status: newStaff.status,
-      };
+      const { data, error } = await supabase
+        .from("staff")
+        .insert([
+          {
+            name: newStaffName,
+            email: newStaffEmail,
+            department: newStaffDepartment,
+            status: newStaffStatus,
+          },
+        ])
+        .select();
 
-      const { error } = await supabase
-        .from('staff')
-        .insert([staffToInsert]);
+      if (error) throw error;
 
-      if (error) {
-        console.error('Error adding staff:', error);
-        Alert.alert('Error', 'Failed to add staff member');
-      } else {
-        Alert.alert('Success', 'Staff member added successfully');
-        setShowAddStaffModal(false);
-        setNewStaff({
-          name: '',
-          position: '',
-          email: '',
-          phone: '',
-          department_id: '',
-          status: 'active'
-        });
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error in addStaff:', error);
-      Alert.alert('Error', 'Failed to add staff member');
+      setStaffList((prev) => [...prev, ...(data || [])]);
+      setShowAddStaffModal(false);
+      setNewStaffName("");
+      setNewStaffEmail("");
+      setNewStaffDepartment("");
+      setNewStaffStatus("active");
+      Alert.alert("Success", "Staff member added successfully!");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const editStaff = async () => {
-    if (!editingStaff || !editStaffForm.name || !editStaffForm.position || !editStaffForm.email) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!editingStaff || !editStaffName || !editStaffEmail || !editStaffDepartment) {
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('staff')
+      const { data, error } = await supabase
+        .from("staff")
         .update({
-          name: editStaffForm.name,
-          position: editStaffForm.position,
-          email: editStaffForm.email,
-          phone: editStaffForm.phone || null,
-          department_id: editStaffForm.department_id || null,
-          status: editStaffForm.status,
+          name: editStaffName,
+          email: editStaffEmail,
+          department: editStaffDepartment,
+          status: editStaffStatus,
         })
-        .eq('id', editingStaff.id);
+        .eq("id", editingStaff.id)
+        .select();
 
-      if (error) {
-        console.error('Error updating staff:', error);
-        Alert.alert('Error', 'Failed to update staff member');
-      } else {
-        Alert.alert('Success', 'Staff member updated successfully');
-        setShowEditStaffModal(false);
-        setEditingStaff(null);
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error in editStaff:', error);
-      Alert.alert('Error', 'Failed to update staff member');
+      if (error) throw error;
+
+      setStaffList((prev) =>
+        prev.map((staff) =>
+          staff.id === editingStaff.id ? (data?.[0] || staff) : staff
+        )
+      );
+      setShowEditStaffModal(false);
+      setEditingStaff(null);
+      Alert.alert("Success", "Staff member updated successfully!");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const openEditStaffModal = (staffMember: Staff) => {
-    console.log('Opening edit modal for staff:', staffMember.name);
     setEditingStaff(staffMember);
-    setEditStaffForm({
-      name: staffMember.name,
-      position: staffMember.position,
-      email: staffMember.email,
-      phone: staffMember.phone || '',
-      department_id: staffMember.department_id || '',
-      status: staffMember.status || 'active'
-    });
+    setEditStaffName(staffMember.name || "");
+    setEditStaffEmail(staffMember.email || "");
+    setEditStaffDepartment(staffMember.department || "");
+    setEditStaffStatus(staffMember.status || "active");
     setShowEditStaffModal(true);
   };
 
   const removeStaff = async (staffId: string, staffName: string) => {
-    console.log('removeStaff function called with:', { staffId, staffName });
     Alert.alert(
-      'Remove Staff',
+      "Remove Staff",
       `Are you sure you want to remove ${staffName}?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => console.log('Staff removal cancelled')
-        },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "OK",
           onPress: async () => {
-            console.log('Attempting to remove staff:', staffName);
             try {
               const { error } = await supabase
-                .from('staff')
+                .from("staff")
                 .delete()
-                .eq('id', staffId);
+                .eq("id", staffId);
 
-              if (error) {
-                console.error('Error removing staff:', error);
-                Alert.alert('Error', 'Failed to remove staff member');
-              } else {
-                console.log('Staff member removed successfully:', staffName);
-                Alert.alert('Success', 'Staff member removed successfully');
-                fetchData();
-              }
-            } catch (error) {
-              console.error('Error in removeStaff:', error);
-              Alert.alert('Error', 'Failed to remove staff member');
+              if (error) throw error;
+
+              setStaffList((prev) => prev.filter((staff) => staff.id !== staffId));
+              Alert.alert("Success", "Staff member removed successfully!");
+            } catch (error: any) {
+              Alert.alert("Error", error.message);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   const addDepartment = async () => {
-    if (!newDepartment.name) {
-      Alert.alert('Error', 'Please enter a department name');
+    if (!newDepartmentName) {
+      Alert.alert("Error", "Please enter a department name");
       return;
     }
 
     try {
-      const departmentToInsert: TablesInsert<'departments'> = {
-        name: newDepartment.name,
-        description: newDepartment.description || null,
-      };
+      const { data, error } = await supabase
+        .from("departments")
+        .insert([
+          {
+            name: newDepartmentName,
+            description: newDepartmentDescription,
+          },
+        ])
+        .select();
 
-      const { error } = await supabase
-        .from('departments')
-        .insert([departmentToInsert]);
+      if (error) throw error;
 
-      if (error) {
-        console.error('Error adding department:', error);
-        Alert.alert('Error', 'Failed to add department');
-      } else {
-        Alert.alert('Success', 'Department added successfully');
-        setShowAddDepartmentModal(false);
-        setNewDepartment({ name: '', description: '' });
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error in addDepartment:', error);
-      Alert.alert('Error', 'Failed to add department');
+      setDepartments((prev) => [...prev, ...(data || [])]);
+      setShowAddDepartmentModal(false);
+      setNewDepartmentName("");
+      setNewDepartmentDescription("");
+      Alert.alert("Success", "Department added successfully!");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const editDepartment = async () => {
-    if (!editingDepartment || !editDepartmentForm.name) {
-      Alert.alert('Error', 'Please enter a department name');
+    if (!editingDepartment || !editDepartmentName) {
+      Alert.alert("Error", "Please enter a department name");
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('departments')
+      const { data, error } = await supabase
+        .from("departments")
         .update({
-          name: editDepartmentForm.name,
-          description: editDepartmentForm.description || null,
+          name: editDepartmentName,
+          description: editDepartmentDescription,
         })
-        .eq('id', editingDepartment.id);
+        .eq("id", editingDepartment.id)
+        .select();
 
-      if (error) {
-        console.error('Error updating department:', error);
-        Alert.alert('Error', 'Failed to update department');
-      } else {
-        Alert.alert('Success', 'Department updated successfully');
-        setShowEditDepartmentModal(false);
-        setEditingDepartment(null);
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error in editDepartment:', error);
-      Alert.alert('Error', 'Failed to update department');
+      if (error) throw error;
+
+      setDepartments((prev) =>
+        prev.map((dept) =>
+          dept.id === editingDepartment.id ? (data?.[0] || dept) : dept
+        )
+      );
+      setShowEditDepartmentModal(false);
+      setEditingDepartment(null);
+      Alert.alert("Success", "Department updated successfully!");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const openEditDepartmentModal = (department: Department) => {
-    console.log('Opening edit modal for department:', department.name);
     setEditingDepartment(department);
-    setEditDepartmentForm({
-      name: department.name,
-      description: department.description || ''
-    });
+    setEditDepartmentName(department.name || "");
+    setEditDepartmentDescription(department.description || "");
     setShowEditDepartmentModal(true);
   };
 
   const removeDepartment = async (departmentId: string, departmentName: string) => {
-    console.log('removeDepartment function called with:', { departmentId, departmentName });
     Alert.alert(
-      'Remove Department',
-      `Are you sure you want to remove ${departmentName}? This will unassign all staff from this department.`,
+      "Remove Department",
+      `Are you sure you want to remove ${departmentName}?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => console.log('Department removal cancelled')
-        },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "OK",
           onPress: async () => {
-            console.log('Attempting to remove department:', departmentName);
             try {
               const { error } = await supabase
-                .from('departments')
+                .from("departments")
                 .delete()
-                .eq('id', departmentId);
+                .eq("id", departmentId);
 
-              if (error) {
-                console.error('Error removing department:', error);
-                Alert.alert('Error', 'Failed to remove department');
-              } else {
-                console.log('Department removed successfully:', departmentName);
-                Alert.alert('Success', 'Department removed successfully');
-                fetchData();
-              }
-            } catch (error) {
-              console.error('Error in removeDepartment:', error);
-              Alert.alert('Error', 'Failed to remove department');
+              if (error) throw error;
+
+              setDepartments((prev) => prev.filter((dept) => dept.id !== departmentId));
+              Alert.alert("Success", "Department removed successfully!");
+            } catch (error: any) {
+              Alert.alert("Error", error.message);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   const getStatusColor = (status: string) => {
-    return status === 'active' ? colors.primary : colors.textSecondary;
+    switch (status) {
+      case "active":
+        return "#4CAF50";
+      case "inactive":
+        return "#F44336";
+      default:
+        return colors.textSecondary;
+    }
   };
 
   const renderStaffCard = ({ item }: { item: Staff }) => (
-    <View style={[styles.staffCard, { backgroundColor: colors.card }]}>
-      <View style={styles.staffHeader}>
-        <View style={[styles.avatarContainer, { backgroundColor: colors.secondary + '20' }]}>
-          <IconSymbol name={item.avatar || 'person.circle.fill'} color={colors.primary} size={32} />
-        </View>
-        <View style={styles.staffInfo}>
-          <Text style={[styles.staffName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.staffPosition, { color: colors.textSecondary }]}>{item.position}</Text>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status || 'active') }]} />
-            <Text style={[styles.statusText, { color: getStatusColor(item.status || 'active') }]}>
-              {(item.status || 'active').charAt(0).toUpperCase() + (item.status || 'active').slice(1)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.actionButtons}>
+    <View style={[styles.card, { backgroundColor: colors.card }]}>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
+        <View style={styles.cardActions}>
           <Pressable
-            style={({ pressed }) => [
-              styles.editButton, 
-              { 
-                backgroundColor: pressed ? colors.primary + '40' : colors.primary + '20',
-                opacity: pressed ? 0.8 : 1
-              }
-            ]}
-            onPress={() => {
-              console.log('Edit icon pressed for staff:', item.name);
-              openEditStaffModal(item);
-            }}
-            accessibilityLabel={`Edit ${item.name}`}
-            accessibilityRole="button"
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={() => openEditStaffModal(item)}
           >
-            <IconSymbol name="pencil" color={colors.primary} size={20} />
+            <IconSymbol name="pencil" color="white" size={16} />
           </Pressable>
           <Pressable
-            style={({ pressed }) => [
-              styles.removeButton, 
-              { 
-                backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
-                opacity: pressed ? 0.8 : 1
-              }
-            ]}
-            onPress={() => {
-              console.log('Trash icon pressed for staff:', item.name);
-              removeStaff(item.id, item.name);
-            }}
-            accessibilityLabel={`Remove ${item.name}`}
-            accessibilityRole="button"
+            style={[styles.actionButton, { backgroundColor: colors.accent }]}
+            onPress={() => removeStaff(item.id, item.name || "")}
           >
-            <IconSymbol name="trash" color={colors.accent} size={20} />
+            <IconSymbol name="trash" color="white" size={16} />
           </Pressable>
         </View>
       </View>
-      
-      <View style={styles.staffDetails}>
-        <View style={styles.detailRow}>
-          <IconSymbol name="building.2.fill" color={colors.textSecondary} size={16} />
-          <Text style={[styles.detailText, { color: colors.textSecondary }]}>
-            {item.departments?.name || 'No Department'}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <IconSymbol name="envelope.fill" color={colors.textSecondary} size={16} />
-          <Text style={[styles.detailText, { color: colors.textSecondary }]}>{item.email}</Text>
-        </View>
-        {item.phone && (
-          <View style={styles.detailRow}>
-            <IconSymbol name="phone.fill" color={colors.textSecondary} size={16} />
-            <Text style={[styles.detailText, { color: colors.textSecondary }]}>{item.phone}</Text>
-          </View>
-        )}
-        <View style={styles.detailRow}>
-          <IconSymbol name="calendar" color={colors.textSecondary} size={16} />
-          <Text style={[styles.detailText, { color: colors.textSecondary }]}>
-            Joined: {item.join_date ? new Date(item.join_date).toLocaleDateString() : 'N/A'}
-          </Text>
-        </View>
+      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.email}</Text>
+      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.department}</Text>
+      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || "") }]}>
+        <Text style={styles.statusText}>{item.status}</Text>
       </View>
     </View>
   );
 
   const renderDepartmentCard = ({ item }: { item: Department }) => (
-    <View style={[styles.departmentCard, { backgroundColor: colors.card }]}>
-      <View style={styles.departmentHeader}>
-        <View style={styles.departmentInfo}>
-          <Text style={[styles.departmentName, { color: colors.text }]}>{item.name}</Text>
-          {item.description && (
-            <Text style={[styles.departmentDescription, { color: colors.textSecondary }]}>
-              {item.description}
-            </Text>
-          )}
-        </View>
-        <View style={styles.actionButtons}>
+    <View style={[styles.card, { backgroundColor: colors.card }]}>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
+        <View style={styles.cardActions}>
           <Pressable
-            style={({ pressed }) => [
-              styles.editButton, 
-              { 
-                backgroundColor: pressed ? colors.primary + '40' : colors.primary + '20',
-                opacity: pressed ? 0.8 : 1
-              }
-            ]}
-            onPress={() => {
-              console.log('Edit icon pressed for department:', item.name);
-              openEditDepartmentModal(item);
-            }}
-            accessibilityLabel={`Edit ${item.name} department`}
-            accessibilityRole="button"
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={() => openEditDepartmentModal(item)}
           >
-            <IconSymbol name="pencil" color={colors.primary} size={20} />
+            <IconSymbol name="pencil" color="white" size={16} />
           </Pressable>
           <Pressable
-            style={({ pressed }) => [
-              styles.removeButton, 
-              { 
-                backgroundColor: pressed ? colors.accent + '40' : colors.accent + '20',
-                opacity: pressed ? 0.8 : 1
-              }
-            ]}
-            onPress={() => {
-              console.log('Trash icon pressed for department:', item.name);
-              removeDepartment(item.id, item.name);
-            }}
-            accessibilityLabel={`Remove ${item.name} department`}
-            accessibilityRole="button"
+            style={[styles.actionButton, { backgroundColor: colors.accent }]}
+            onPress={() => removeDepartment(item.id, item.name || "")}
           >
-            <IconSymbol name="trash" color={colors.accent} size={20} />
+            <IconSymbol name="trash" color="white" size={16} />
           </Pressable>
         </View>
       </View>
+      <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.description}</Text>
     </View>
   );
 
   const renderDashboardStats = () => (
     <View style={styles.statsContainer}>
-      <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-        <IconSymbol name="person.3.fill" color={colors.primary} size={24} />
-        <Text style={[styles.statNumber, { color: colors.text }]}>{staff.length}</Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Staff</Text>
+      <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
+        <Text style={styles.statNumber}>{staffList.length}</Text>
+        <Text style={styles.statLabel}>Total Staff</Text>
       </View>
-      
-      <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-        <IconSymbol name="checkmark.circle.fill" color={colors.primary} size={24} />
-        <Text style={[styles.statNumber, { color: colors.text }]}>
-          {staff.filter(s => s.status === 'active').length}
-        </Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Active</Text>
+      <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
+        <Text style={styles.statNumber}>{departments.length}</Text>
+        <Text style={styles.statLabel}>Departments</Text>
       </View>
-      
-      <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-        <IconSymbol name="building.2.fill" color={colors.primary} size={24} />
-        <Text style={[styles.statNumber, { color: colors.text }]}>{departments.length}</Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Departments</Text>
+      <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
+        <Text style={styles.statNumber}>{staffList.filter(s => s.status === 'active').length}</Text>
+        <Text style={styles.statLabel}>Active Staff</Text>
       </View>
     </View>
   );
 
   const renderAddStaffModal = () => (
-    <Modal
-      visible={showAddStaffModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowAddStaffModal(false)}
-    >
+    <Modal visible={showAddStaffModal} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Staff</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Staff Member</Text>
           <Pressable onPress={() => setShowAddStaffModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
-        
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Name *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={newStaffName}
+              onChangeText={setNewStaffName}
               placeholder="Enter staff name"
               placeholderTextColor={colors.textSecondary}
-              value={newStaff.name}
-              onChangeText={(text) => setNewStaff({ ...newStaff, name: text })}
             />
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Position *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              placeholder="Enter position"
-              placeholderTextColor={colors.textSecondary}
-              value={newStaff.position}
-              onChangeText={(text) => setNewStaff({ ...newStaff, position: text })}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={newStaffEmail}
+              onChangeText={setNewStaffEmail}
               placeholder="Enter email address"
-              placeholderTextColor={colors.textSecondary}
-              value={newStaff.email}
-              onChangeText={(text) => setNewStaff({ ...newStaff, email: text })}
               keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Phone</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              placeholder="Enter phone number"
               placeholderTextColor={colors.textSecondary}
-              value={newStaff.phone}
-              onChangeText={(text) => setNewStaff({ ...newStaff, phone: text })}
-              keyboardType="phone-pad"
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>Department</Text>
-            <View style={styles.pickerContainer}>
-              {departments.map((dept) => (
-                <Pressable
-                  key={dept.id}
-                  style={[
-                    styles.pickerOption,
-                    { 
-                      backgroundColor: newStaff.department_id === dept.id ? colors.primary + '20' : colors.card,
-                      borderColor: newStaff.department_id === dept.id ? colors.primary : colors.secondary + '30'
-                    }
-                  ]}
-                  onPress={() => setNewStaff({ ...newStaff, department_id: dept.id })}
-                >
-                  <Text style={[
-                    styles.pickerOptionText,
-                    { color: newStaff.department_id === dept.id ? colors.primary : colors.text }
-                  ]}>
-                    {dept.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={newStaffDepartment}
+              onChangeText={setNewStaffDepartment}
+              placeholder="Enter department"
+              placeholderTextColor={colors.textSecondary}
+            />
           </View>
-
-          <View style={styles.buttonContainer}>
-            <Pressable
-              style={[styles.cancelButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowAddStaffModal(false)}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={addStaff}
-            >
-              <Text style={styles.addButtonText}>Add Staff</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={addStaff}
+          >
+            <Text style={styles.submitButtonText}>Add Staff Member</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </Modal>
   );
 
   const renderEditStaffModal = () => (
-    <Modal
-      visible={showEditStaffModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowEditStaffModal(false)}
-    >
+    <Modal visible={showEditStaffModal} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Staff</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Staff Member</Text>
           <Pressable onPress={() => setShowEditStaffModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
-        
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Name *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={editStaffName}
+              onChangeText={setEditStaffName}
               placeholder="Enter staff name"
               placeholderTextColor={colors.textSecondary}
-              value={editStaffForm.name}
-              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, name: text })}
             />
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Position *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              placeholder="Enter position"
-              placeholderTextColor={colors.textSecondary}
-              value={editStaffForm.position}
-              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, position: text })}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={editStaffEmail}
+              onChangeText={setEditStaffEmail}
               placeholder="Enter email address"
-              placeholderTextColor={colors.textSecondary}
-              value={editStaffForm.email}
-              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, email: text })}
               keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Phone</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              placeholder="Enter phone number"
               placeholderTextColor={colors.textSecondary}
-              value={editStaffForm.phone}
-              onChangeText={(text) => setEditStaffForm({ ...editStaffForm, phone: text })}
-              keyboardType="phone-pad"
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>Department</Text>
-            <View style={styles.pickerContainer}>
-              {departments.map((dept) => (
-                <Pressable
-                  key={dept.id}
-                  style={[
-                    styles.pickerOption,
-                    { 
-                      backgroundColor: editStaffForm.department_id === dept.id ? colors.primary + '20' : colors.card,
-                      borderColor: editStaffForm.department_id === dept.id ? colors.primary : colors.secondary + '30'
-                    }
-                  ]}
-                  onPress={() => setEditStaffForm({ ...editStaffForm, department_id: dept.id })}
-                >
-                  <Text style={[
-                    styles.pickerOptionText,
-                    { color: editStaffForm.department_id === dept.id ? colors.primary : colors.text }
-                  ]}>
-                    {dept.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={editStaffDepartment}
+              onChangeText={setEditStaffDepartment}
+              placeholder="Enter department"
+              placeholderTextColor={colors.textSecondary}
+            />
           </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
-            <View style={styles.statusPickerContainer}>
-              <Pressable
-                style={[
-                  styles.statusOption,
-                  { 
-                    backgroundColor: editStaffForm.status === 'active' ? colors.primary + '20' : colors.card,
-                    borderColor: editStaffForm.status === 'active' ? colors.primary : colors.secondary + '30'
-                  }
-                ]}
-                onPress={() => setEditStaffForm({ ...editStaffForm, status: 'active' })}
-              >
-                <Text style={[
-                  styles.statusOptionText,
-                  { color: editStaffForm.status === 'active' ? colors.primary : colors.text }
-                ]}>
-                  Active
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.statusOption,
-                  { 
-                    backgroundColor: editStaffForm.status === 'inactive' ? colors.primary + '20' : colors.card,
-                    borderColor: editStaffForm.status === 'inactive' ? colors.primary : colors.secondary + '30'
-                  }
-                ]}
-                onPress={() => setEditStaffForm({ ...editStaffForm, status: 'inactive' })}
-              >
-                <Text style={[
-                  styles.statusOptionText,
-                  { color: editStaffForm.status === 'inactive' ? colors.primary : colors.text }
-                ]}>
-                  Inactive
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <Pressable
-              style={[styles.cancelButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowEditStaffModal(false)}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={editStaff}
-            >
-              <Text style={styles.addButtonText}>Update Staff</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={editStaff}
+          >
+            <Text style={styles.submitButtonText}>Update Staff Member</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </Modal>
   );
 
   const renderAddDepartmentModal = () => (
-    <Modal
-      visible={showAddDepartmentModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowAddDepartmentModal(false)}
-    >
+    <Modal visible={showAddDepartmentModal} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
         <View style={styles.modalHeader}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Department</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Department</Text>
           <Pressable onPress={() => setShowAddDepartmentModal(false)}>
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
-        
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department Name *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Department Name</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={newDepartmentName}
+              onChangeText={setNewDepartmentName}
               placeholder="Enter department name"
               placeholderTextColor={colors.textSecondary}
-              value={newDepartment.name}
-              onChangeText={(text) => setNewDepartment({ ...newDepartment, name: text })}
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>Description</Text>
             <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              value={newDepartmentDescription}
+              onChangeText={setNewDepartmentDescription}
               placeholder="Enter department description"
-              placeholderTextColor={colors.textSecondary}
-              value={newDepartment.description}
-              onChangeText={(text) => setNewDepartment({ ...newDepartment, description: text })}
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
-
-          <View style={styles.buttonContainer}>
-            <Pressable
-              style={[styles.cancelButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowAddDepartmentModal(false)}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={addDepartment}
-            >
-              <Text style={styles.addButtonText}>Add Department</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={addDepartment}
+          >
+            <Text style={styles.submitButtonText}>Add Department</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </Modal>
   );
 
   const renderEditDepartmentModal = () => (
-    <Modal
-      visible={showEditDepartmentModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowEditDepartmentModal(false)}
-    >
+    <Modal visible={showEditDepartmentModal} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
         <View style={styles.modalHeader}>
           <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Department</Text>
@@ -885,47 +517,35 @@ export default function AdminDashboard() {
             <IconSymbol name="xmark" color={colors.text} size={24} />
           </Pressable>
         </View>
-        
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department Name *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Department Name</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+              value={editDepartmentName}
+              onChangeText={setEditDepartmentName}
               placeholder="Enter department name"
               placeholderTextColor={colors.textSecondary}
-              value={editDepartmentForm.name}
-              onChangeText={(text) => setEditDepartmentForm({ ...editDepartmentForm, name: text })}
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>Description</Text>
             <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
+              value={editDepartmentDescription}
+              onChangeText={setEditDepartmentDescription}
               placeholder="Enter department description"
-              placeholderTextColor={colors.textSecondary}
-              value={editDepartmentForm.description}
-              onChangeText={(text) => setEditDepartmentForm({ ...editDepartmentForm, description: text })}
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
-
-          <View style={styles.buttonContainer}>
-            <Pressable
-              style={[styles.cancelButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowEditDepartmentModal(false)}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={editDepartment}
-            >
-              <Text style={styles.addButtonText}>Update Department</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.submitButton, { backgroundColor: colors.primary }]}
+            onPress={editDepartment}
+          >
+            <Text style={styles.submitButtonText}>Update Department</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </Modal>
@@ -949,68 +569,52 @@ export default function AdminDashboard() {
           }}
         />
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            <View style={styles.header}>
-              <View style={[styles.iconContainer, { backgroundColor: colors.accent }]}>
-                <IconSymbol name="person.badge.key.fill" color="white" size={32} />
-              </View>
-              <Text style={[styles.title, { color: colors.text }]}>Admin Access</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Enter your administrator credentials
-              </Text>
+          <View style={styles.loginContainer}>
+            <Text style={[styles.loginTitle, { color: colors.text }]}>Admin Login</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Username</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter username"
+                autoCapitalize="none"
+                placeholderTextColor={colors.textSecondary}
+              />
             </View>
 
-            <View style={styles.form}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Username</Text>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Password</Text>
+              <View style={styles.passwordContainer}>
                 <TextInput
-                  style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                  placeholder="Enter admin username"
+                  style={[styles.passwordInput, { backgroundColor: colors.card, color: colors.text }]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter password"
+                  secureTextEntry={!showPassword}
                   placeholderTextColor={colors.textSecondary}
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
                 />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.passwordInput, { backgroundColor: colors.card, color: colors.text }]}
-                    placeholder="Enter admin password"
-                    placeholderTextColor={colors.textSecondary}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={isSecureEntry}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                <Pressable
+                  style={styles.passwordToggle}
+                  onPress={togglePasswordVisibility}
+                >
+                  <IconSymbol
+                    name={showPassword ? "eye.slash" : "eye"}
+                    color={colors.textSecondary}
+                    size={20}
                   />
-                  <Pressable onPress={togglePasswordVisibility} style={styles.eyeButton}>
-                    <IconSymbol 
-                      name={isSecureEntry ? "eye.slash.fill" : "eye.fill"} 
-                      color={colors.textSecondary} 
-                      size={20} 
-                    />
-                  </Pressable>
-                </View>
-              </View>
-
-              <Pressable
-                style={[styles.loginButton, { backgroundColor: colors.accent }]}
-                onPress={handleLogin}
-              >
-                <Text style={styles.loginButtonText}>Login as Admin</Text>
-              </Pressable>
-
-              <View style={styles.helpSection}>
-                <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                  Contact system administrator for credentials
-                </Text>
+                </Pressable>
               </View>
             </View>
-          </ScrollView>
+
+            <Pressable
+              style={[styles.loginButton, { backgroundColor: colors.primary }]}
+              onPress={handleLogin}
+            >
+              <Text style={styles.loginButtonText}>Login</Text>
+            </Pressable>
+          </View>
         </View>
       </>
     );
@@ -1032,82 +636,57 @@ export default function AdminDashboard() {
           ),
           headerRight: () => (
             <Pressable onPress={handleLogout} style={styles.logoutButton}>
-              <IconSymbol name="power" color={colors.accent} size={24} />
+              <Text style={[styles.logoutText, { color: colors.accent }]}>Logout</Text>
             </Pressable>
           ),
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView style={styles.dashboardContainer}>
-          <View style={styles.dashboardHeader}>
-            <Text style={[styles.dashboardTitle, { color: colors.text }]}>Staff Dashboard</Text>
-            <Text style={[styles.dashboardSubtitle, { color: colors.textSecondary }]}>
-              Manage staff members and departments
-            </Text>
-          </View>
-
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
           {renderDashboardStats()}
-
-          <View style={styles.actionButtonsContainer}>
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: colors.primary }]}
-              onPress={() => setShowAddStaffModal(true)}
-            >
-              <IconSymbol name="person.badge.plus" color="white" size={20} />
-              <Text style={styles.actionButtonText}>Add Staff</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: colors.secondary }]}
-              onPress={() => setShowAddDepartmentModal(true)}
-            >
-              <IconSymbol name="building.2.fill" color="white" size={20} />
-              <Text style={styles.actionButtonText}>Add Department</Text>
-            </Pressable>
+          
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Management</Text>
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowAddStaffModal(true)}
+              >
+                <IconSymbol name="plus" color="white" size={20} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={staffList}
+              renderItem={renderStaffCard}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
           </View>
 
-          <View style={styles.staffSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              All Staff ({staff.length})
-            </Text>
-            
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={staff}
-                renderItem={renderStaffCard}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.staffList}
-              />
-            )}
-          </View>
-
-          <View style={styles.departmentsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Departments ({departments.length})
-            </Text>
-            
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Department Management</Text>
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowAddDepartmentModal(true)}
+              >
+                <IconSymbol name="plus" color="white" size={20} />
+              </Pressable>
+            </View>
             <FlatList
               data={departments}
               renderItem={renderDepartmentCard}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.departmentsList}
             />
           </View>
         </ScrollView>
-      </View>
 
-      {renderAddStaffModal()}
-      {renderEditStaffModal()}
-      {renderAddDepartmentModal()}
-      {renderEditDepartmentModal()}
+        {renderAddStaffModal()}
+        {renderEditStaffModal()}
+        {renderAddDepartmentModal()}
+        {renderEditDepartmentModal()}
+      </View>
     </>
   );
 }
@@ -1117,13 +696,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    padding: 20,
-    justifyContent: 'center',
-    minHeight: '100%',
-  },
-  dashboardContainer: {
-    flex: 1,
-    padding: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   backButton: {
     padding: 8,
@@ -1133,48 +707,36 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: -8,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
+  logoutText: {
     fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
+    fontWeight: '600',
   },
-  form: {
-    gap: 24,
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  loginTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 32,
   },
   inputGroup: {
-    gap: 8,
+    marginBottom: 20,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 8,
   },
   input: {
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: colors.secondary + '30',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
+    borderColor: '#E0E0E0',
+    minHeight: 48,
   },
   passwordContainer: {
     position: 'relative',
@@ -1185,45 +747,35 @@ const styles = StyleSheet.create({
     paddingRight: 50,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: colors.secondary + '30',
+    borderColor: '#E0E0E0',
+    minHeight: 48,
   },
-  eyeButton: {
+  passwordToggle: {
     position: 'absolute',
     right: 16,
-    top: 16,
+    top: 14,
     padding: 4,
+  },
+  textArea: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
   loginButton: {
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
+    minHeight: 48,
   },
   loginButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  helpSection: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  helpText: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  dashboardHeader: {
-    marginBottom: 24,
-  },
-  dashboardTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  dashboardSubtitle: {
-    fontSize: 16,
-    lineHeight: 22,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -1236,238 +788,109 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.secondary + '20',
   },
   statNumber: {
     fontSize: 24,
     fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 4,
+    color: 'white',
   },
   statLabel: {
     fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  actionButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: 4,
   },
-  staffSection: {
+  section: {
     marginBottom: 24,
   },
-  departmentsSection: {
-    marginBottom: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 16,
   },
-  staffList: {
-    gap: 16,
-  },
-  departmentsList: {
-    gap: 12,
-  },
-  staffCard: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.secondary + '20',
-  },
-  staffHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  staffInfo: {
-    flex: 1,
+  card: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  staffName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  staffPosition: {
-    fontSize: 14,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    padding: 10,
-    borderRadius: 8,
-    minWidth: 40,
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary + '40',
-  },
-  removeButton: {
-    padding: 10,
-    borderRadius: 8,
-    minWidth: 40,
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.accent + '40',
-  },
-  staffDetails: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  detailText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  departmentCard: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.secondary + '20',
-  },
-  departmentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  departmentInfo: {
-    flex: 1,
-  },
-  departmentName: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    flex: 1,
+  },
+  cardSubtitle: {
+    fontSize: 14,
     marginBottom: 4,
   },
-  departmentDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  loadingContainer: {
-    padding: 40,
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    padding: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingTop: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
   },
   modalContent: {
     flex: 1,
-  },
-  pickerContainer: {
-    gap: 8,
-  },
-  pickerOption: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  pickerOptionText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  statusPickerContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statusOption: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  statusOptionText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-    marginBottom: 40,
-  },
-  cancelButton: {
-    flex: 1,
     padding: 16,
+  },
+  submitButton: {
     borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.secondary + '30',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  addButton: {
-    flex: 1,
     padding: 16,
-    borderRadius: 12,
     alignItems: 'center',
+    marginTop: 20,
+    minHeight: 48,
   },
-  addButtonText: {
+  submitButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
