@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { colors, spacing, borderRadius, shadows, typography, commonStyles } from "@/styles/commonStyles";
 import { supabase } from "@/app/integrations/supabase/client";
 import { IconSymbol } from "@/components/IconSymbol";
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList, Platform } from "react-native";
 import { Stack, router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -48,6 +48,7 @@ export default function RegisterWorkDay() {
       if (error) throw error;
       setStaffList(data || []);
     } catch (error: any) {
+      console.log("Error fetching staff:", error);
       Alert.alert("Error", error.message);
     }
   };
@@ -61,7 +62,30 @@ export default function RegisterWorkDay() {
       if (error) throw error;
       setDepartments(data || []);
     } catch (error: any) {
+      console.log("Error fetching departments:", error);
       Alert.alert("Error", error.message);
+    }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    console.log("Date picker event:", event.type, selectedDate);
+    
+    // On Android, the picker is dismissed automatically
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    // Handle the selected date
+    if (event.type === 'set' && selectedDate) {
+      setDate(selectedDate);
+      console.log("Date updated to:", selectedDate.toLocaleDateString());
+    } else if (event.type === 'dismissed') {
+      console.log("Date picker was dismissed");
+    }
+    
+    // On iOS, we need to manually close the picker when done
+    if (Platform.OS === 'ios' && event.type === 'set') {
+      setShowDatePicker(false);
     }
   };
 
@@ -77,16 +101,31 @@ export default function RegisterWorkDay() {
       return;
     }
 
+    if (hoursFloat > 24) {
+      Alert.alert("Error", "Hours cannot exceed 24 per day");
+      return;
+    }
+
     try {
+      // Format date as YYYY-MM-DD for database
+      const formattedDate = date.toISOString().split('T')[0];
+      console.log("Submitting work entry:", {
+        staff_id: selectedStaff.id,
+        department_id: selectedDepartment.id,
+        date: formattedDate,
+        hours: hoursFloat,
+        work_type: selectedWorkType,
+      });
+
       const { error } = await supabase
         .from("work_entries")
         .insert([
           {
             staff_id: selectedStaff.id,
             department_id: selectedDepartment.id,
-            date: date.toISOString().split('T')[0],
+            date: formattedDate,
             hours: hoursFloat,
-            description: selectedWorkType,
+            work_type: selectedWorkType,
           },
         ]);
 
@@ -106,8 +145,18 @@ export default function RegisterWorkDay() {
         },
       ]);
     } catch (error: any) {
+      console.log("Error submitting work entry:", error);
       Alert.alert("Error", error.message);
     }
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const renderStaffItem = ({ item, index }: { item: Staff; index: number }) => (
@@ -316,14 +365,17 @@ export default function RegisterWorkDay() {
               <Text style={[commonStyles.bodyMedium, styles.label]}>Date *</Text>
               <Pressable
                 style={[styles.selector, commonStyles.cardElevated]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  console.log("Opening date picker");
+                  setShowDatePicker(true);
+                }}
               >
                 <View style={styles.selectedItem}>
                   <View style={[styles.dateIcon, { backgroundColor: colors.primary + '20' }]}>
                     <IconSymbol name="calendar" color={colors.primary} size={16} />
                   </View>
                   <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
-                    {date.toLocaleDateString()}
+                    {formatDate(date)}
                   </Text>
                 </View>
                 <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
@@ -373,19 +425,48 @@ export default function RegisterWorkDay() {
           </View>
         </ScrollView>
 
-        {/* Date Picker */}
+        {/* Date Picker - Platform specific rendering */}
         {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) {
-                setDate(selectedDate);
-              }
-            }}
-          />
+          <>
+            {Platform.OS === 'ios' ? (
+              <Modal
+                visible={showDatePicker}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowDatePicker(false)}
+              >
+                <BlurView intensity={100} style={styles.datePickerModal}>
+                  <View style={styles.datePickerHeader}>
+                    <Pressable onPress={() => setShowDatePicker(false)}>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.primary }]}>Cancel</Text>
+                    </Pressable>
+                    <Text style={[commonStyles.heading3, { color: colors.text }]}>Select Date</Text>
+                    <Pressable onPress={() => setShowDatePicker(false)}>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.primary }]}>Done</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.datePickerContainer}>
+                    <DateTimePicker
+                      value={date}
+                      mode="date"
+                      display="spinner"
+                      onChange={handleDateChange}
+                      maximumDate={new Date()}
+                      style={styles.datePicker}
+                    />
+                  </View>
+                </BlurView>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            )}
+          </>
         )}
 
         {/* Staff Modal */}
@@ -564,6 +645,29 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
     minHeight: 56,
+  },
+  
+  // Date Picker Styles
+  datePickerModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  datePickerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePicker: {
+    width: '100%',
+    height: 200,
   },
   
   // Modal Styles
