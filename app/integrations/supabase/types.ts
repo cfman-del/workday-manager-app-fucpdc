@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -84,6 +85,60 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_entries: {
+        Row: {
+          created_at: string | null
+          date: string
+          department_id: string
+          description: string | null
+          hours: number
+          id: string
+          project: string | null
+          staff_id: string | null
+          updated_at: string | null
+          work_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          department_id: string
+          description?: string | null
+          hours: number
+          id?: string
+          project?: string | null
+          staff_id?: string | null
+          updated_at?: string | null
+          work_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          department_id?: string
+          description?: string | null
+          hours?: number
+          id?: string
+          project?: string | null
+          staff_id?: string | null
+          updated_at?: string | null
+          work_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_entries_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]
