@@ -487,9 +487,6 @@ export default function AdminDashboard() {
           </Pressable>
         </View>
       </View>
-      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || "") }]}>
-        <Text style={styles.statusText}>{item.status}</Text>
-      </View>
     </View>
   );
 
@@ -1355,7 +1352,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   cardTitle: {
     fontSize: 16,
