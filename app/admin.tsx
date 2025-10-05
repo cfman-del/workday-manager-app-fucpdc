@@ -5,6 +5,7 @@ import { Stack, router } from "expo-router";
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from "react-native";
 import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
+import FloatingTabBar, { TabBarItem } from "@/components/FloatingTabBar";
 import React, { useState, useEffect } from "react";
 
 type Staff = Tables<"staff">;
@@ -17,6 +18,7 @@ export default function AdminDashboard() {
   const [showPassword, setShowPassword] = useState(false);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [activeTab, setActiveTab] = useState(0);
   
   // Modal states
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
@@ -42,6 +44,36 @@ export default function AdminDashboard() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [editDepartmentName, setEditDepartmentName] = useState("");
   const [editDepartmentDescription, setEditDepartmentDescription] = useState("");
+
+  // Tab configuration
+  const tabs: TabBarItem[] = [
+    {
+      name: "dashboard",
+      route: "/admin",
+      icon: "square.grid.2x2.fill",
+      label: "Dashboard"
+    },
+    {
+      name: "overview",
+      route: "/admin",
+      icon: "chart.bar.fill",
+      label: "Overview"
+    }
+  ];
+
+  // Mock data for overview
+  const stats = {
+    totalHours: 168,
+    daysWorked: 21,
+    averageHours: 8,
+    currentStreak: 5,
+  };
+
+  const recentEntries = [
+    { date: "2024-01-15", hours: 8, project: "Mobile App", description: "Implemented user authentication" },
+    { date: "2024-01-14", hours: 7.5, project: "Web Dashboard", description: "Fixed responsive design issues" },
+    { date: "2024-01-13", hours: 8.5, project: "Mobile App", description: "Added navigation and routing" },
+  ];
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -361,6 +393,123 @@ export default function AdminDashboard() {
     </View>
   );
 
+  // Overview components
+  const StatCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: string; color: string }) => (
+    <View style={[styles.overviewStatCard, { backgroundColor: colors.card }]}>
+      <View style={[styles.statIcon, { backgroundColor: color }]}>
+        <IconSymbol name={icon as any} color="white" size={24} />
+      </View>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statTitle, { color: colors.textSecondary }]}>{title}</Text>
+    </View>
+  );
+
+  const EntryCard = ({ entry }: { entry: typeof recentEntries[0] }) => (
+    <View style={[styles.entryCard, { backgroundColor: colors.card }]}>
+      <View style={styles.entryHeader}>
+        <Text style={[styles.entryDate, { color: colors.text }]}>{entry.date}</Text>
+        <Text style={[styles.entryHours, { color: colors.primary }]}>{entry.hours}h</Text>
+      </View>
+      <Text style={[styles.entryProject, { color: colors.textSecondary }]}>{entry.project}</Text>
+      <Text style={[styles.entryDescription, { color: colors.text }]}>{entry.description}</Text>
+    </View>
+  );
+
+  const renderOverviewContent = () => (
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <View style={styles.overviewHeader}>
+        <View style={[styles.iconContainer, { backgroundColor: colors.secondary }]}>
+          <IconSymbol name="chart.bar.fill" color="white" size={32} />
+        </View>
+        <Text style={[styles.overviewTitle, { color: colors.text }]}>Work Overview</Text>
+        <Text style={[styles.overviewSubtitle, { color: colors.textSecondary }]}>
+          Your work summary and statistics
+        </Text>
+      </View>
+
+      <View style={styles.overviewStatsSection}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Statistics</Text>
+        <View style={styles.overviewStatsGrid}>
+          <StatCard
+            title="Total Hours"
+            value={stats.totalHours}
+            icon="clock.fill"
+            color={colors.primary}
+          />
+          <StatCard
+            title="Days Worked"
+            value={stats.daysWorked}
+            icon="calendar.fill"
+            color={colors.secondary}
+          />
+          <StatCard
+            title="Avg Hours/Day"
+            value={stats.averageHours}
+            icon="chart.line.uptrend.xyaxis"
+            color={colors.accent}
+          />
+          <StatCard
+            title="Current Streak"
+            value={`${stats.currentStreak} days`}
+            icon="flame.fill"
+            color={colors.highlight}
+          />
+        </View>
+      </View>
+
+      <View style={styles.entriesSection}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
+        <View style={styles.entriesList}>
+          {recentEntries.map((entry, index) => (
+            <EntryCard key={index} entry={entry} />
+          ))}
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  const renderDashboardContent = () => (
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      {renderDashboardStats()}
+      
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Management</Text>
+          <Pressable
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => setShowAddStaffModal(true)}
+          >
+            <IconSymbol name="plus" color="white" size={20} />
+          </Pressable>
+        </View>
+        <FlatList
+          data={staffList}
+          renderItem={renderStaffCard}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Department Management</Text>
+          <Pressable
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => setShowAddDepartmentModal(true)}
+          >
+            <IconSymbol name="plus" color="white" size={20} />
+          </Pressable>
+        </View>
+        <FlatList
+          data={departments}
+          renderItem={renderDepartmentCard}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+      </View>
+    </ScrollView>
+  );
+
   const renderAddStaffModal = () => (
     <Modal visible={showAddStaffModal} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
@@ -551,6 +700,11 @@ export default function AdminDashboard() {
     </Modal>
   );
 
+  const handleTabPress = (tabIndex: number) => {
+    console.log(`Tab ${tabIndex} pressed`);
+    setActiveTab(tabIndex);
+  };
+
   if (!isLoggedIn) {
     return (
       <>
@@ -624,7 +778,7 @@ export default function AdminDashboard() {
     <>
       <Stack.Screen
         options={{
-          title: "Admin Dashboard",
+          title: activeTab === 0 ? "Admin Dashboard" : "Overview",
           headerStyle: {
             backgroundColor: colors.background,
           },
@@ -642,45 +796,58 @@ export default function AdminDashboard() {
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {renderDashboardStats()}
-          
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Management</Text>
-              <Pressable
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowAddStaffModal(true)}
-              >
-                <IconSymbol name="plus" color="white" size={20} />
-              </Pressable>
-            </View>
-            <FlatList
-              data={staffList}
-              renderItem={renderStaffCard}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          </View>
+        {/* Tab Content */}
+        <View style={styles.tabContent}>
+          {activeTab === 0 ? renderDashboardContent() : renderOverviewContent()}
+        </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Department Management</Text>
-              <Pressable
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowAddDepartmentModal(true)}
+        {/* Custom Tab Bar */}
+        <View style={styles.customTabBar}>
+          <View style={[styles.tabBarContainer, { backgroundColor: colors.card }]}>
+            <Pressable
+              style={[
+                styles.tabButton,
+                activeTab === 0 && { backgroundColor: colors.primary }
+              ]}
+              onPress={() => handleTabPress(0)}
+            >
+              <IconSymbol
+                name="square.grid.2x2.fill"
+                color={activeTab === 0 ? "white" : colors.text}
+                size={20}
+              />
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  { color: activeTab === 0 ? "white" : colors.text }
+                ]}
               >
-                <IconSymbol name="plus" color="white" size={20} />
-              </Pressable>
-            </View>
-            <FlatList
-              data={departments}
-              renderItem={renderDepartmentCard}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
+                Dashboard
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.tabButton,
+                activeTab === 1 && { backgroundColor: colors.primary }
+              ]}
+              onPress={() => handleTabPress(1)}
+            >
+              <IconSymbol
+                name="chart.bar.fill"
+                color={activeTab === 1 ? "white" : colors.text}
+                size={20}
+              />
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  { color: activeTab === 1 ? "white" : colors.text }
+                ]}
+              >
+                Overview
+              </Text>
+            </Pressable>
           </View>
-        </ScrollView>
+        </View>
 
         {renderAddStaffModal()}
         {renderEditStaffModal()}
@@ -695,9 +862,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  tabContent: {
+    flex: 1,
+  },
   scrollContainer: {
     paddingVertical: 20,
     paddingHorizontal: 16,
+    paddingBottom: 100, // Add padding to account for tab bar
   },
   backButton: {
     padding: 8,
@@ -894,5 +1065,127 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Custom Tab Bar Styles
+  customTabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    borderRadius: 25,
+    padding: 8,
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
+    elevation: 8,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 17,
+    gap: 8,
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Overview Styles
+  overviewHeader: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  overviewTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  overviewSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  overviewStatsSection: {
+    marginBottom: 32,
+  },
+  overviewStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  overviewStatCard: {
+    flex: 1,
+    minWidth: '45%',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statTitle: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  entriesSection: {
+    marginBottom: 32,
+  },
+  entriesList: {
+    gap: 12,
+  },
+  entryCard: {
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  entryDate: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  entryHours: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  entryProject: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  entryDescription: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
