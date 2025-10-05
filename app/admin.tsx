@@ -406,9 +406,6 @@ export default function AdminDashboard() {
           </Pressable>
         </View>
       </View>
-      {item.position && (
-        <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{item.position}</Text>
-      )}
       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || "") }]}>
         <Text style={styles.statusText}>{item.status}</Text>
       </View>
