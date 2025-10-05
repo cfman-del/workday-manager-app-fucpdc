@@ -18,8 +18,8 @@ export default function AdminLogin() {
     
     console.log("Admin login attempt:", { username });
     
-    // Updated authentication credentials
-    if (username === "cfman@mudo.se" && password === "4218manMudo") {
+    // Mock authentication - in a real app, this would connect to your backend
+    if (username === "admin" && password === "admin123") {
       Alert.alert(
         "Success", 
         "Admin login successful!",
@@ -108,7 +108,7 @@ export default function AdminLogin() {
 
             <View style={styles.helpSection}>
               <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-                Contact system administrator for credentials
+                Demo credentials: admin / admin123
               </Text>
             </View>
           </View>
