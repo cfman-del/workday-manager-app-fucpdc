@@ -61,18 +61,17 @@ export default function AdminDashboard() {
     }
   ];
 
-  // Mock data for overview
-  const stats = {
-    totalHours: 168,
-    daysWorked: 21,
-    averageHours: 8,
-    currentStreak: 5,
-  };
+  // Work overview state
+  const [workEntries, setWorkEntries] = useState<any[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [staffWorkHours, setStaffWorkHours] = useState<{[key: string]: number}>({});
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
 
-  const recentEntries = [
-    { date: "2024-01-15", hours: 8, project: "Mobile App", description: "Implemented user authentication" },
-    { date: "2024-01-14", hours: 7.5, project: "Web Dashboard", description: "Fixed responsive design issues" },
-    { date: "2024-01-13", hours: 8.5, project: "Mobile App", description: "Added navigation and routing" },
+  // Generate months for picker
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
   useEffect(() => {
@@ -81,18 +80,92 @@ export default function AdminDashboard() {
     }
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    if (isLoggedIn && workEntries.length > 0) {
+      calculateStaffWorkHours(workEntries, selectedMonth, selectedYear);
+    }
+  }, [selectedMonth, selectedYear, workEntries, isLoggedIn]);
+
   const fetchData = async () => {
     try {
-      const [staffResponse, departmentsResponse] = await Promise.all([
+      const [staffResponse, departmentsResponse, workEntriesResponse] = await Promise.all([
         supabase.from("staff").select("*"),
-        supabase.from("departments").select("*")
+        supabase.from("departments").select("*"),
+        supabase.from("work_entries").select(`
+          *,
+          staff:staff_id (
+            id,
+            name,
+            email
+          )
+        `)
       ]);
 
       if (staffResponse.error) throw staffResponse.error;
       if (departmentsResponse.error) throw departmentsResponse.error;
+      if (workEntriesResponse.error) throw workEntriesResponse.error;
 
       setStaffList(staffResponse.data || []);
       setDepartments(departmentsResponse.data || []);
+      setWorkEntries(workEntriesResponse.data || []);
+      
+      // Calculate staff work hours for selected month
+      calculateStaffWorkHours(workEntriesResponse.data || [], selectedMonth, selectedYear);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    }
+  };
+
+  const calculateStaffWorkHours = (entries: any[], month: number, year: number) => {
+    const currentYear = new Date().getFullYear();
+    
+    // Only process data for the current year
+    if (year !== currentYear) {
+      setStaffWorkHours({});
+      return;
+    }
+
+    const staffHours: {[key: string]: number} = {};
+    
+    entries.forEach(entry => {
+      const entryDate = new Date(entry.date);
+      if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
+        const staffId = entry.staff_id;
+        const staffName = entry.staff?.name || 'Unknown Staff';
+        const key = `${staffId}-${staffName}`;
+        
+        if (!staffHours[key]) {
+          staffHours[key] = 0;
+        }
+        staffHours[key] += parseFloat(entry.hours) || 0;
+      }
+    });
+    
+    setStaffWorkHours(staffHours);
+  };
+
+  const fetchWorkEntriesForMonth = async (month: number, year: number) => {
+    try {
+      const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+      const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from("work_entries")
+        .select(`
+          *,
+          staff:staff_id (
+            id,
+            name,
+            email
+          )
+        `)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (error) throw error;
+      
+      setWorkEntries(data || []);
+      calculateStaffWorkHours(data || [], month, year);
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
@@ -415,58 +488,205 @@ export default function AdminDashboard() {
     </View>
   );
 
-  const renderOverviewContent = () => (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.overviewHeader}>
-        <View style={[styles.iconContainer, { backgroundColor: colors.secondary }]}>
-          <IconSymbol name="chart.bar.fill" color="white" size={32} />
-        </View>
-        <Text style={[styles.overviewTitle, { color: colors.text }]}>Work Overview</Text>
-        <Text style={[styles.overviewSubtitle, { color: colors.textSecondary }]}>
-          Your work summary and statistics
-        </Text>
-      </View>
+  const renderOverviewContent = () => {
+    const currentYear = new Date().getFullYear();
+    const totalHours = Object.values(staffWorkHours).reduce((sum, hours) => sum + hours, 0);
+    const staffCount = Object.keys(staffWorkHours).length;
+    const avgHours = staffCount > 0 ? (totalHours / staffCount).toFixed(1) : 0;
 
-      <View style={styles.overviewStatsSection}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Statistics</Text>
-        <View style={styles.overviewStatsGrid}>
-          <StatCard
-            title="Total Hours"
-            value={stats.totalHours}
-            icon="clock.fill"
-            color={colors.primary}
-          />
-          <StatCard
-            title="Days Worked"
-            value={stats.daysWorked}
-            icon="calendar.fill"
-            color={colors.secondary}
-          />
-          <StatCard
-            title="Avg Hours/Day"
-            value={stats.averageHours}
-            icon="chart.line.uptrend.xyaxis"
-            color={colors.accent}
-          />
-          <StatCard
-            title="Current Streak"
-            value={`${stats.currentStreak} days`}
-            icon="flame.fill"
-            color={colors.highlight}
-          />
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.overviewHeader}>
+          <View style={[styles.iconContainer, { backgroundColor: colors.secondary }]}>
+            <IconSymbol name="chart.bar.fill" color="white" size={32} />
+          </View>
+          <Text style={[styles.overviewTitle, { color: colors.text }]}>Work Overview</Text>
+          <Text style={[styles.overviewSubtitle, { color: colors.textSecondary }]}>
+            Staff work hours for {months[selectedMonth]} {selectedYear}
+          </Text>
         </View>
-      </View>
 
-      <View style={styles.entriesSection}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
-        <View style={styles.entriesList}>
-          {recentEntries.map((entry, index) => (
-            <EntryCard key={index} entry={entry} />
-          ))}
+        {/* Month Filter */}
+        <View style={styles.filterSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Filter by Month</Text>
+          <Pressable
+            style={[styles.monthPicker, { backgroundColor: colors.card }]}
+            onPress={() => setShowMonthPicker(true)}
+          >
+            <Text style={[styles.monthPickerText, { color: colors.text }]}>
+              {months[selectedMonth]} {selectedYear}
+            </Text>
+            <IconSymbol name="chevron.down" color={colors.text} size={20} />
+          </Pressable>
         </View>
-      </View>
-    </ScrollView>
-  );
+
+        {/* Summary Stats */}
+        <View style={styles.overviewStatsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Monthly Summary</Text>
+          <View style={styles.overviewStatsGrid}>
+            <StatCard
+              title="Total Hours"
+              value={totalHours.toFixed(1)}
+              icon="clock.fill"
+              color={colors.primary}
+            />
+            <StatCard
+              title="Active Staff"
+              value={staffCount}
+              icon="person.2.fill"
+              color={colors.secondary}
+            />
+            <StatCard
+              title="Avg Hours/Staff"
+              value={avgHours}
+              icon="chart.line.uptrend.xyaxis"
+              color={colors.accent}
+            />
+            <StatCard
+              title="Work Days"
+              value={workEntries.length}
+              icon="calendar.fill"
+              color={colors.highlight}
+            />
+          </View>
+        </View>
+
+        {/* Staff Work Hours */}
+        <View style={styles.staffHoursSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Work Hours</Text>
+          {Object.keys(staffWorkHours).length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+              <IconSymbol name="clock" color={colors.textSecondary} size={48} />
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                No work entries found for {months[selectedMonth]} {selectedYear}
+              </Text>
+              {selectedYear !== currentYear && (
+                <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
+                  Data is only saved for the current year ({currentYear})
+                </Text>
+              )}
+            </View>
+          ) : (
+            <View style={styles.staffHoursList}>
+              {Object.entries(staffWorkHours)
+                .sort(([, hoursA], [, hoursB]) => hoursB - hoursA)
+                .map(([staffKey, hours]) => {
+                  const [staffId, staffName] = staffKey.split('-');
+                  return (
+                    <View key={staffKey} style={[styles.staffHourCard, { backgroundColor: colors.card }]}>
+                      <View style={styles.staffHourHeader}>
+                        <View style={[styles.staffAvatar, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.staffAvatarText}>
+                            {staffName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.staffHourInfo}>
+                          <Text style={[styles.staffHourName, { color: colors.text }]}>
+                            {staffName}
+                          </Text>
+                          <Text style={[styles.staffHourHours, { color: colors.primary }]}>
+                            {hours.toFixed(1)} hours
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.staffHourProgress}>
+                        <View 
+                          style={[
+                            styles.staffHourProgressBar, 
+                            { 
+                              backgroundColor: colors.primary,
+                              width: `${Math.min((hours / Math.max(...Object.values(staffWorkHours))) * 100, 100)}%`
+                            }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+            </View>
+          )}
+        </View>
+
+        {/* Recent Entries */}
+        {workEntries.length > 0 && (
+          <View style={styles.entriesSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
+            <View style={styles.entriesList}>
+              {workEntries
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 5)
+                .map((entry, index) => (
+                  <View key={index} style={[styles.entryCard, { backgroundColor: colors.card }]}>
+                    <View style={styles.entryHeader}>
+                      <Text style={[styles.entryDate, { color: colors.text }]}>
+                        {new Date(entry.date).toLocaleDateString()}
+                      </Text>
+                      <Text style={[styles.entryHours, { color: colors.primary }]}>
+                        {entry.hours}h
+                      </Text>
+                    </View>
+                    <Text style={[styles.entryProject, { color: colors.textSecondary }]}>
+                      {entry.staff?.name || 'Unknown Staff'}
+                    </Text>
+                    <Text style={[styles.entryDescription, { color: colors.text }]}>
+                      {entry.description || 'No description'}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          </View>
+        )}
+
+        {/* Month Picker Modal */}
+        <Modal visible={showMonthPicker} animationType="slide" presentationStyle="pageSheet">
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Month</Text>
+              <Pressable onPress={() => setShowMonthPicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.yearSection}>
+                <Text style={[styles.yearTitle, { color: colors.text }]}>Year: {currentYear}</Text>
+                <Text style={[styles.yearSubtitle, { color: colors.textSecondary }]}>
+                  Only current year data is available
+                </Text>
+              </View>
+              <View style={styles.monthGrid}>
+                {months.map((month, index) => (
+                  <Pressable
+                    key={index}
+                    style={[
+                      styles.monthButton,
+                      { backgroundColor: colors.card },
+                      selectedMonth === index && { backgroundColor: colors.primary }
+                    ]}
+                    onPress={() => {
+                      setSelectedMonth(index);
+                      setSelectedYear(currentYear);
+                      fetchWorkEntriesForMonth(index, currentYear);
+                      setShowMonthPicker(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.monthButtonText,
+                        { color: colors.text },
+                        selectedMonth === index && { color: 'white' }
+                      ]}
+                    >
+                      {month}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </Modal>
+      </ScrollView>
+    );
+  };
 
   const renderDashboardContent = () => (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -1187,5 +1407,122 @@ const styles = StyleSheet.create({
   entryDescription: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  // New styles for work overview
+  filterSection: {
+    marginBottom: 24,
+  },
+  monthPicker: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  monthPickerText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  staffHoursSection: {
+    marginBottom: 32,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+    borderRadius: 16,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  staffHoursList: {
+    gap: 12,
+  },
+  staffHourCard: {
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  staffHourHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  staffAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  staffAvatarText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  staffHourInfo: {
+    flex: 1,
+  },
+  staffHourName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  staffHourHours: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  staffHourProgress: {
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  staffHourProgressBar: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  yearSection: {
+    marginBottom: 24,
+    padding: 16,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+  },
+  yearTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  yearSubtitle: {
+    fontSize: 14,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  monthButton: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  monthButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
