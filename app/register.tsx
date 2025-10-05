@@ -18,7 +18,6 @@ const WORK_TYPES = [
 
 export default function RegisterWorkDay() {
   const [workHours, setWorkHours] = useState('');
-  const [description, setDescription] = useState('');
   const [workType, setWorkType] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -95,7 +94,6 @@ export default function RegisterWorkDay() {
             date: date,
             hours: hours,
             work_type: workType,
-            description: description || null,
           },
         ]);
 
@@ -206,19 +204,6 @@ export default function RegisterWorkDay() {
                 </Text>
                 <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
               </Pressable>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Additional Description (Optional)</Text>
-              <TextInput
-                style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Add any additional details about your work..."
-                multiline
-                numberOfLines={4}
-                placeholderTextColor={colors.textSecondary}
-              />
             </View>
 
             <Pressable
@@ -453,15 +438,6 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 12,
     marginTop: 4,
-  },
-  textArea: {
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    minHeight: 120,
-    textAlignVertical: 'top',
   },
   submitButton: {
     borderRadius: 12,
