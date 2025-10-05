@@ -26,10 +26,8 @@ export default function AdminDashboard() {
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [showEditDepartmentModal, setShowEditDepartmentModal] = useState(false);
   
-  // Form states
+  // Form states - removed email and department fields
   const [newStaffName, setNewStaffName] = useState("");
-  const [newStaffEmail, setNewStaffEmail] = useState("");
-  const [newStaffDepartment, setNewStaffDepartment] = useState("");
   const [newStaffStatus, setNewStaffStatus] = useState("active");
   
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -189,8 +187,8 @@ export default function AdminDashboard() {
   };
 
   const addStaff = async () => {
-    if (!newStaffName || !newStaffEmail || !newStaffDepartment) {
-      Alert.alert("Error", "Please fill in all fields");
+    if (!newStaffName) {
+      Alert.alert("Error", "Please enter a staff name");
       return;
     }
 
@@ -200,8 +198,6 @@ export default function AdminDashboard() {
         .insert([
           {
             name: newStaffName,
-            email: newStaffEmail,
-            department: newStaffDepartment,
             status: newStaffStatus,
           },
         ])
@@ -212,8 +208,6 @@ export default function AdminDashboard() {
       setStaffList((prev) => [...prev, ...(data || [])]);
       setShowAddStaffModal(false);
       setNewStaffName("");
-      setNewStaffEmail("");
-      setNewStaffDepartment("");
       setNewStaffStatus("active");
       Alert.alert("Success", "Staff member added successfully!");
     } catch (error: any) {
@@ -746,25 +740,45 @@ export default function AdminDashboard() {
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              value={newStaffEmail}
-              onChangeText={setNewStaffEmail}
-              placeholder="Enter email address"
-              keyboardType="email-address"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>Department</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-              value={newStaffDepartment}
-              onChangeText={setNewStaffDepartment}
-              placeholder="Enter department"
-              placeholderTextColor={colors.textSecondary}
-            />
+            <Text style={[styles.label, { color: colors.text }]}>Status</Text>
+            <View style={styles.statusContainer}>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { backgroundColor: colors.card },
+                  newStaffStatus === "active" && { backgroundColor: colors.primary }
+                ]}
+                onPress={() => setNewStaffStatus("active")}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    { color: colors.text },
+                    newStaffStatus === "active" && { color: "white" }
+                  ]}
+                >
+                  Active
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.statusOption,
+                  { backgroundColor: colors.card },
+                  newStaffStatus === "inactive" && { backgroundColor: colors.accent }
+                ]}
+                onPress={() => setNewStaffStatus("inactive")}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    { color: colors.text },
+                    newStaffStatus === "inactive" && { color: "white" }
+                  ]}
+                >
+                  Inactive
+                </Text>
+              </Pressable>
+            </View>
           </View>
           <Pressable
             style={[styles.submitButton, { backgroundColor: colors.primary }]}
