@@ -19,6 +19,13 @@ export default function HomeScreen() {
       color: colors.primary,
     },
     {
+      title: "Overview",
+      description: "View work summary and reports",
+      route: "/overview",
+      icon: "chart.bar.fill",
+      color: colors.secondary,
+    },
+    {
       title: "Admin login",
       description: "Administrative access",
       route: "/admin",
