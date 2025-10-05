@@ -1,79 +1,58 @@
+
 import React from "react";
 import { Stack, Link } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View, Text, Alert, Platform } from "react-native";
+import { ScrollView, Pressable, StyleSheet, View, Text, Platform } from "react-native";
 import { IconSymbol } from "@/components/IconSymbol";
 import { GlassView } from "expo-glass-effect";
 import { useTheme } from "@react-navigation/native";
-
-const ICON_COLOR = "#007AFF";
+import { colors } from "@/styles/commonStyles";
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const modalDemos = [
+  
+  const menuOptions = [
     {
-      title: "Standard Modal",
-      description: "Full screen modal presentation",
-      route: "/modal",
-      color: "#007AFF",
+      title: "Register work day",
+      description: "Log your daily work activities",
+      route: "/register",
+      icon: "calendar.badge.plus",
+      color: colors.primary,
     },
     {
-      title: "Form Sheet",
-      description: "Bottom sheet with detents and grabber",
-      route: "/formsheet",
-      color: "#34C759",
+      title: "Overview",
+      description: "View work summary and reports",
+      route: "/overview",
+      icon: "chart.bar.fill",
+      color: colors.secondary,
     },
     {
-      title: "Transparent Modal",
-      description: "Overlay without obscuring background",
-      route: "/transparent-modal",
-      color: "#FF9500",
+      title: "Admin login",
+      description: "Administrative access",
+      route: "/admin",
+      icon: "person.badge.key.fill",
+      color: colors.accent,
     }
   ];
 
-  const renderModalDemo = ({ item }: { item: (typeof modalDemos)[0] }) => (
-    <GlassView style={[
-      styles.demoCard,
-      Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-    ]} glassEffectStyle="regular">
-      <View style={[styles.demoIcon, { backgroundColor: item.color }]}>
-        <IconSymbol name="square.grid.3x3" color="white" size={24} />
-      </View>
-      <View style={styles.demoContent}>
-        <Text style={[styles.demoTitle, { color: theme.colors.text }]}>{item.title}</Text>
-        <Text style={[styles.demoDescription, { color: theme.dark ? '#98989D' : '#666' }]}>{item.description}</Text>
-      </View>
-      <Link href={item.route as any} asChild>
-        <Pressable>
-          <GlassView style={[
-            styles.tryButton,
-            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }
-          ]} glassEffectStyle="clear">
-            <Text style={[styles.tryButtonText, { color: theme.colors.primary }]}>Try It</Text>
-          </GlassView>
-        </Pressable>
-      </Link>
-    </GlassView>
-  );
-
-  const renderHeaderRight = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol name="plus" color={theme.colors.primary} />
-    </Pressable>
-  );
-
-  const renderHeaderLeft = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol
-        name="gear"
-        color={theme.colors.primary}
-      />
-    </Pressable>
+  const renderMenuOption = (item: typeof menuOptions[0], index: number) => (
+    <Link href={item.route as any} asChild key={item.route}>
+      <Pressable style={({ pressed }) => [
+        styles.optionCard,
+        { backgroundColor: colors.card },
+        pressed && styles.optionCardPressed
+      ]}>
+        <View style={[styles.optionIcon, { backgroundColor: item.color }]}>
+          <IconSymbol name={item.icon as any} color="white" size={28} />
+        </View>
+        <View style={styles.optionContent}>
+          <Text style={[styles.optionTitle, { color: colors.text }]}>{item.title}</Text>
+          <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{item.description}</Text>
+        </View>
+        <View style={styles.chevronContainer}>
+          <IconSymbol name="chevron.right" color={colors.textSecondary} size={20} />
+        </View>
+      </Pressable>
+    </Link>
   );
 
   return (
@@ -81,24 +60,33 @@ export default function HomeScreen() {
       {Platform.OS === 'ios' && (
         <Stack.Screen
           options={{
-            title: "Building the app...",
-            headerRight: renderHeaderRight,
-            headerLeft: renderHeaderLeft,
+            title: "Work Tracker",
+            headerStyle: {
+              backgroundColor: colors.background,
+            },
+            headerTintColor: colors.text,
           }}
         />
       )}
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <FlatList
-          data={modalDemos}
-          renderItem={renderModalDemo}
-          keyExtractor={(item) => item.route}
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
           contentContainerStyle={[
-            styles.listContainer,
-            Platform.OS !== 'ios' && styles.listContainerWithTabBar
+            styles.scrollContainer,
+            Platform.OS !== 'ios' && styles.scrollContainerWithTabBar
           ]}
-          contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
-        />
+        >
+          <View style={styles.header}>
+            <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome</Text>
+            <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
+              Choose an option to get started
+            </Text>
+          </View>
+          
+          <View style={styles.optionsContainer}>
+            {menuOptions.map((item, index) => renderMenuOption(item, index))}
+          </View>
+        </ScrollView>
       </View>
     </>
   );
@@ -107,55 +95,64 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor handled dynamically
   },
-  listContainer: {
-    paddingVertical: 16,
+  scrollContainer: {
+    paddingVertical: 20,
     paddingHorizontal: 16,
   },
-  listContainerWithTabBar: {
+  scrollContainerWithTabBar: {
     paddingBottom: 100, // Extra padding for floating tab bar
   },
-  demoCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingTop: 20,
+  },
+  welcomeTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  optionsContainer: {
+    gap: 16,
+  },
+  optionCard: {
+    borderRadius: 16,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
   },
-  demoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  optionCardPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  optionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  demoContent: {
+  optionContent: {
     flex: 1,
   },
-  demoTitle: {
+  optionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 4,
-    // color handled dynamically
   },
-  demoDescription: {
+  optionDescription: {
     fontSize: 14,
     lineHeight: 18,
-    // color handled dynamically
   },
-  headerButtonContainer: {
-    padding: 6,
-  },
-  tryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  tryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    // color handled dynamically
+  chevronContainer: {
+    marginLeft: 8,
   },
 });
