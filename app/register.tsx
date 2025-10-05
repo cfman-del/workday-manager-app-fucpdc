@@ -8,19 +8,31 @@ import { supabase } from "@/app/integrations/supabase/client";
 import { Tables } from "@/app/integrations/supabase/types";
 
 type Staff = Tables<"staff">;
+type Department = Tables<"departments">;
+
+const WORK_TYPES = [
+  "Regular class",
+  "Shimsa", 
+  "Events"
+];
 
 export default function RegisterWorkDay() {
   const [workHours, setWorkHours] = useState('');
   const [description, setDescription] = useState('');
-  const [project, setProject] = useState('');
+  const [workType, setWorkType] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [departmentList, setDepartmentList] = useState<Department[]>([]);
   const [showStaffPicker, setShowStaffPicker] = useState(false);
+  const [showDepartmentPicker, setShowDepartmentPicker] = useState(false);
+  const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchStaff();
+    fetchDepartments();
   }, []);
 
   const fetchStaff = async () => {
@@ -37,12 +49,26 @@ export default function RegisterWorkDay() {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      setDepartmentList(data || []);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    }
+  };
+
   const handleSubmit = async () => {
     const currentYear = new Date().getFullYear();
     const entryYear = new Date(date).getFullYear();
 
-    if (!workHours || !description || !selectedStaff) {
-      Alert.alert('Error', 'Please fill in all fields and select a staff member');
+    if (!workHours || !workType || !selectedStaff || !selectedDepartment) {
+      Alert.alert('Error', 'Please fill in all required fields: staff member, department, work hours, and type of work');
       return;
     }
 
@@ -65,10 +91,11 @@ export default function RegisterWorkDay() {
         .insert([
           {
             staff_id: selectedStaff.id,
+            department_id: selectedDepartment.id,
             date: date,
             hours: hours,
-            description: description,
-            project: project || null,
+            work_type: workType,
+            description: description || null,
           },
         ]);
 
@@ -114,7 +141,7 @@ export default function RegisterWorkDay() {
         >
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Staff Member</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Staff Member *</Text>
               <Pressable
                 style={[styles.input, { backgroundColor: colors.card }]}
                 onPress={() => setShowStaffPicker(true)}
@@ -127,7 +154,20 @@ export default function RegisterWorkDay() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Date</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Department *</Text>
+              <Pressable
+                style={[styles.input, { backgroundColor: colors.card }]}
+                onPress={() => setShowDepartmentPicker(true)}
+              >
+                <Text style={[styles.inputText, { color: selectedDepartment ? colors.text : colors.textSecondary }]}>
+                  {selectedDepartment ? selectedDepartment.name : 'Select department'}
+                </Text>
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Date *</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
                 value={date}
@@ -141,7 +181,7 @@ export default function RegisterWorkDay() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Work Hours</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Work Hours *</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
                 value={workHours}
@@ -156,23 +196,25 @@ export default function RegisterWorkDay() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Project (Optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, color: colors.text }]}
-                value={project}
-                onChangeText={setProject}
-                placeholder="Project name"
-                placeholderTextColor={colors.textSecondary}
-              />
+              <Text style={[styles.label, { color: colors.text }]}>Types of work *</Text>
+              <Pressable
+                style={[styles.input, { backgroundColor: colors.card }]}
+                onPress={() => setShowWorkTypePicker(true)}
+              >
+                <Text style={[styles.inputText, { color: workType ? colors.text : colors.textSecondary }]}>
+                  {workType || 'Select type of work'}
+                </Text>
+                <IconSymbol name="chevron.down" color={colors.textSecondary} size={20} />
+              </Pressable>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Additional Description (Optional)</Text>
               <TextInput
                 style={[styles.textArea, { backgroundColor: colors.card, color: colors.text }]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Describe your work activities..."
+                placeholder="Add any additional details about your work..."
                 multiline
                 numberOfLines={4}
                 placeholderTextColor={colors.textSecondary}
@@ -250,6 +292,116 @@ export default function RegisterWorkDay() {
                 </Pressable>
               )}
               contentContainerStyle={styles.staffList}
+            />
+          </View>
+        </Modal>
+
+        {/* Department Picker Modal */}
+        <Modal visible={showDepartmentPicker} animationType="slide" presentationStyle="pageSheet">
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Department</Text>
+              <Pressable onPress={() => setShowDepartmentPicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={departmentList}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[
+                    styles.departmentItem,
+                    { backgroundColor: colors.card },
+                    selectedDepartment?.id === item.id && { backgroundColor: colors.primary }
+                  ]}
+                  onPress={() => {
+                    setSelectedDepartment(item);
+                    setShowDepartmentPicker(false);
+                  }}
+                >
+                  <View style={[styles.departmentIcon, { backgroundColor: colors.secondary }]}>
+                    <IconSymbol 
+                      name="building.2" 
+                      color="white" 
+                      size={20} 
+                    />
+                  </View>
+                  <View style={styles.departmentInfo}>
+                    <Text
+                      style={[
+                        styles.departmentName,
+                        { color: selectedDepartment?.id === item.id ? 'white' : colors.text }
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    {item.description && (
+                      <Text
+                        style={[
+                          styles.departmentDescription,
+                          { color: selectedDepartment?.id === item.id ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
+                        ]}
+                      >
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                  {selectedDepartment?.id === item.id && (
+                    <IconSymbol name="checkmark" color="white" size={20} />
+                  )}
+                </Pressable>
+              )}
+              contentContainerStyle={styles.departmentList}
+            />
+          </View>
+        </Modal>
+
+        {/* Work Type Picker Modal */}
+        <Modal visible={showWorkTypePicker} animationType="slide" presentationStyle="pageSheet">
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Type of Work</Text>
+              <Pressable onPress={() => setShowWorkTypePicker(false)}>
+                <IconSymbol name="xmark" color={colors.text} size={24} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={WORK_TYPES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[
+                    styles.workTypeItem,
+                    { backgroundColor: colors.card },
+                    workType === item && { backgroundColor: colors.primary }
+                  ]}
+                  onPress={() => {
+                    setWorkType(item);
+                    setShowWorkTypePicker(false);
+                  }}
+                >
+                  <View style={[styles.workTypeIcon, { backgroundColor: colors.secondary }]}>
+                    <IconSymbol 
+                      name={item === 'Regular class' ? 'book' : item === 'Shimsa' ? 'checkmark.circle' : 'calendar'} 
+                      color="white" 
+                      size={20} 
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.workTypeName,
+                      { color: workType === item ? 'white' : colors.text }
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                  {workType === item && (
+                    <IconSymbol name="checkmark" color="white" size={20} />
+                  )}
+                </Pressable>
+              )}
+              contentContainerStyle={styles.workTypeList}
             />
           </View>
         </Modal>
@@ -373,5 +525,61 @@ const styles = StyleSheet.create({
   },
   staffEmail: {
     fontSize: 14,
+  },
+  departmentList: {
+    padding: 16,
+  },
+  departmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  departmentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  departmentInfo: {
+    flex: 1,
+  },
+  departmentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  departmentDescription: {
+    fontSize: 14,
+  },
+  workTypeList: {
+    padding: 16,
+  },
+  workTypeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  workTypeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  workTypeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
   },
 });
