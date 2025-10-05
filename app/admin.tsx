@@ -215,6 +215,87 @@ export default function AdminDashboard() {
     }
   };
 
+  const importStaffList = async () => {
+    const staffToImport = [
+      "Alice Mkrtchian",
+      "Anna Juharyan",
+      "Damdin Sanzhaev",
+      "David El Shanti",
+      "Ekatarina Rafailovic",
+      "Evylin Wang",
+      "Jae-Won Lee",
+      "Jessica Li",
+      "Lovisa Nihlén",
+      "Lukas Erlandsson",
+      "Nicole Abiad",
+      "Noah Liljeberg",
+      "Vera Angsell",
+      "Vincent Saigne"
+    ];
+
+    Alert.alert(
+      "Import Staff",
+      `Are you sure you want to import ${staffToImport.length} staff members?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Import",
+          onPress: async () => {
+            try {
+              console.log("Starting staff import...");
+              
+              // Check which staff members already exist
+              const { data: existingStaff, error: fetchError } = await supabase
+                .from("staff")
+                .select("name");
+
+              if (fetchError) throw fetchError;
+
+              const existingNames = existingStaff?.map(staff => staff.name) || [];
+              const newStaffToAdd = staffToImport.filter(name => !existingNames.includes(name));
+
+              if (newStaffToAdd.length === 0) {
+                Alert.alert("Info", "All staff members already exist in the database.");
+                return;
+              }
+
+              // Prepare staff data for insertion
+              const staffData = newStaffToAdd.map(name => ({
+                name: name,
+                status: "active",
+                position: "Staff", // Default position
+                email: `${name.toLowerCase().replace(/\s+/g, '.')}@company.com`, // Generate placeholder email
+                join_date: new Date().toISOString().split('T')[0] // Today's date
+              }));
+
+              console.log("Inserting staff data:", staffData);
+
+              const { data, error } = await supabase
+                .from("staff")
+                .insert(staffData)
+                .select();
+
+              if (error) throw error;
+
+              console.log("Staff import successful:", data);
+
+              // Update the staff list
+              setStaffList((prev) => [...prev, ...(data || [])]);
+              
+              Alert.alert(
+                "Success", 
+                `Successfully imported ${newStaffToAdd.length} staff members!\n\nSkipped ${staffToImport.length - newStaffToAdd.length} existing members.`
+              );
+            } catch (error: any) {
+              console.error("Error importing staff:", error);
+              Alert.alert("Error", `Failed to import staff: ${error.message}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const editStaff = async () => {
     if (!editingStaff || !editStaffName) {
       Alert.alert("Error", "Please fill in all fields");
@@ -681,12 +762,21 @@ export default function AdminDashboard() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff Management</Text>
-          <Pressable
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowAddStaffModal(true)}
-          >
-            <IconSymbol name="plus" color="white" size={20} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[styles.importButton, { backgroundColor: colors.secondary }]}
+              onPress={importStaffList}
+            >
+              <IconSymbol name="square.and.arrow.down" color="white" size={16} />
+              <Text style={styles.importButtonText}>Import</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAddStaffModal(true)}
+            >
+              <IconSymbol name="plus" color="white" size={20} />
+            </Pressable>
+          </View>
         </View>
         <FlatList
           data={staffList}
@@ -1229,12 +1319,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  importButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   card: {
     borderRadius: 12,
