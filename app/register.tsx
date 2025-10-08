@@ -46,7 +46,16 @@ export default function RegisterWorkDay() {
         .eq("status", "active");
 
       if (error) throw error;
-      setStaffList(data || []);
+      
+      // Sort staff list alphabetically by name
+      const sortedStaff = (data || []).sort((a, b) => {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return nameA.localeCompare(nameB);
+      });
+      
+      console.log("Staff list sorted alphabetically:", sortedStaff.map(staff => staff.name));
+      setStaffList(sortedStaff);
     } catch (error: any) {
       console.log("Error fetching staff:", error);
       Alert.alert("Error", error.message);
