@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal,
 import { Stack, router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, SlideInDown, ZoomIn, useSharedValue, useAnimatedStyle, withSpring, withSequence, withDelay } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Staff = Tables<"staff">;
@@ -32,6 +32,18 @@ export default function RegisterWorkDay() {
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [showWorkTypeModal, setShowWorkTypeModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [submittedData, setSubmittedData] = useState<{
+    staff: Staff;
+    department: Department;
+    workType: string;
+    hours: string;
+    date: Date;
+  } | null>(null);
+
+  // Animation values for confirmation modal
+  const checkmarkScale = useSharedValue(0);
+  const confettiOpacity = useSharedValue(0);
 
   useEffect(() => {
     fetchStaff();
@@ -98,6 +110,29 @@ export default function RegisterWorkDay() {
     }
   };
 
+  const showConfirmation = (data: {
+    staff: Staff;
+    department: Department;
+    workType: string;
+    hours: string;
+    date: Date;
+  }) => {
+    setSubmittedData(data);
+    setShowConfirmationModal(true);
+    
+    // Animate checkmark
+    checkmarkScale.value = withSequence(
+      withDelay(300, withSpring(1.2, { damping: 8, stiffness: 100 })),
+      withSpring(1, { damping: 12, stiffness: 150 })
+    );
+    
+    // Animate confetti
+    confettiOpacity.value = withSequence(
+      withDelay(600, withSpring(1)),
+      withDelay(2000, withSpring(0))
+    );
+  };
+
   const handleSubmit = async () => {
     if (!selectedStaff || !selectedDepartment || !selectedWorkType || !hours) {
       Alert.alert("Error", "Please fill in all required fields");
@@ -140,23 +175,31 @@ export default function RegisterWorkDay() {
 
       if (error) throw error;
 
-      Alert.alert("Success", "Work day registered successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            // Reset form
-            setSelectedStaff(null);
-            setSelectedDepartment(null);
-            setSelectedWorkType("");
-            setHours("");
-            setDate(new Date());
-          },
-        },
-      ]);
+      // Show beautiful confirmation modal instead of alert
+      showConfirmation({
+        staff: selectedStaff,
+        department: selectedDepartment,
+        workType: selectedWorkType,
+        hours: hours,
+        date: date,
+      });
+
     } catch (error: any) {
       console.log("Error submitting work entry:", error);
       Alert.alert("Error", error.message);
     }
+  };
+
+  const resetForm = () => {
+    setSelectedStaff(null);
+    setSelectedDepartment(null);
+    setSelectedWorkType("");
+    setHours("");
+    setDate(new Date());
+    setShowConfirmationModal(false);
+    setSubmittedData(null);
+    checkmarkScale.value = 0;
+    confettiOpacity.value = 0;
   };
 
   const formatDate = (date: Date) => {
@@ -167,6 +210,14 @@ export default function RegisterWorkDay() {
       day: 'numeric'
     });
   };
+
+  const checkmarkAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkmarkScale.value }],
+  }));
+
+  const confettiAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: confettiOpacity.value,
+  }));
 
   const renderStaffItem = ({ item, index }: { item: Staff; index: number }) => (
     <Animated.View
@@ -534,6 +585,143 @@ export default function RegisterWorkDay() {
             />
           </BlurView>
         </Modal>
+
+        {/* Success Confirmation Modal */}
+        <Modal 
+          visible={showConfirmationModal} 
+          animationType="fade" 
+          transparent={true}
+          onRequestClose={() => setShowConfirmationModal(false)}
+        >
+          <Animated.View 
+            style={styles.confirmationOverlay}
+            entering={FadeInUp.duration(300)}
+          >
+            <Pressable 
+              style={StyleSheet.absoluteFill} 
+              onPress={() => setShowConfirmationModal(false)}
+            />
+            
+            <Animated.View 
+              style={[styles.confirmationModal, commonStyles.cardElevated]}
+              entering={SlideInDown.delay(100).springify()}
+            >
+              {/* Confetti Background */}
+              <Animated.View style={[styles.confettiContainer, confettiAnimatedStyle]}>
+                <Text style={styles.confetti}>🎉</Text>
+                <Text style={styles.confetti}>✨</Text>
+                <Text style={styles.confetti}>🎊</Text>
+                <Text style={styles.confetti}>⭐</Text>
+                <Text style={styles.confetti}>🌟</Text>
+              </Animated.View>
+
+              {/* Success Icon */}
+              <Animated.View style={[styles.successIconContainer, checkmarkAnimatedStyle]}>
+                <LinearGradient
+                  colors={[colors.success, '#4ade80']}
+                  style={styles.successIcon}
+                >
+                  <IconSymbol name="checkmark" color="white" size={40} />
+                </LinearGradient>
+              </Animated.View>
+
+              {/* Success Message */}
+              <Animated.View 
+                style={styles.confirmationContent}
+                entering={FadeInUp.delay(400).springify()}
+              >
+                <Text style={[commonStyles.heading2, styles.confirmationTitle]}>
+                  Work Day Registered!
+                </Text>
+                <Text style={[commonStyles.body, styles.confirmationSubtitle]}>
+                  Your work entry has been successfully recorded
+                </Text>
+
+                {/* Summary Card */}
+                {submittedData && (
+                  <Animated.View 
+                    style={[styles.summaryCard, commonStyles.cardElevated]}
+                    entering={FadeInUp.delay(600).springify()}
+                  >
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryIcon}>
+                        <IconSymbol name="person.fill" color={colors.primary} size={16} />
+                      </View>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                        {submittedData.staff.name}
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryIcon}>
+                        <IconSymbol name="building.2" color={colors.secondary} size={16} />
+                      </View>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                        {submittedData.department.name}
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryIcon}>
+                        <IconSymbol name="briefcase" color={colors.accent} size={16} />
+                      </View>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                        {submittedData.workType}
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryIcon}>
+                        <IconSymbol name="clock" color={colors.primary} size={16} />
+                      </View>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                        {submittedData.hours} hours
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryIcon}>
+                        <IconSymbol name="calendar" color={colors.secondary} size={16} />
+                      </View>
+                      <Text style={[commonStyles.bodyMedium, { color: colors.text }]}>
+                        {formatDate(submittedData.date)}
+                      </Text>
+                    </View>
+                  </Animated.View>
+                )}
+
+                {/* Action Buttons */}
+                <Animated.View 
+                  style={styles.confirmationActions}
+                  entering={FadeInUp.delay(800).springify()}
+                >
+                  <Pressable
+                    style={[styles.actionButton, styles.secondaryButton]}
+                    onPress={resetForm}
+                  >
+                    <Text style={[commonStyles.bodyMedium, { color: colors.primary }]}>
+                      Register Another
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.actionButton, styles.primaryButton]}
+                    onPress={() => setShowConfirmationModal(false)}
+                  >
+                    <LinearGradient
+                      colors={[colors.primary, colors.secondary]}
+                      style={styles.primaryButtonGradient}
+                    >
+                      <Text style={[commonStyles.bodyMedium, { color: 'white' }]}>
+                        Done
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Animated.View>
+              </Animated.View>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
       </LinearGradient>
     </>
   );
@@ -710,5 +898,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     gap: spacing.sm,
+  },
+
+  // Confirmation Modal Styles
+  confirmationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  confirmationModal: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  confettiContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    zIndex: 0,
+  },
+  confetti: {
+    fontSize: 24,
+    position: 'absolute',
+  },
+  successIconContainer: {
+    marginBottom: spacing.lg,
+    zIndex: 1,
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.lg,
+  },
+  confirmationContent: {
+    alignItems: 'center',
+    width: '100%',
+    zIndex: 1,
+  },
+  confirmationTitle: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    color: colors.text,
+  },
+  confirmationSubtitle: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
+  },
+  summaryCard: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    width: '100%',
+    marginBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  summaryIcon: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmationActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    width: '100%',
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  primaryButton: {
+    ...shadows.sm,
+  },
+  primaryButtonGradient: {
+    padding: spacing.md,
+    alignItems: 'center',
   },
 });
